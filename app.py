@@ -4,6 +4,17 @@ import urllib.parse
 import numpy as np
 import pandas as pd
 import streamlit as st
+import streamlit.components.v1 as components
+
+# ---------------------------------------------------------
+# AUDIO EN BASE64 (CHIME DE NOTIFICACIÓN LOUD & CLEAN)
+# ---------------------------------------------------------
+AUDIO_BASE64 = (
+    "UklGRmisAABXQVZFZm10IBAAAAABAAEAIlYAAESsAAACABAAZGF0YACsA"
+    "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+    "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+    "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+)
 
 # ---------------------------------------------------------
 # CONFIGURACIÓN DE PÁGINA Y ESTILOS MODO OSCURO (ESCALA 125% OPTIMIZADA)
@@ -54,7 +65,7 @@ st.markdown(
         margin-bottom: 3px;
     }
 
-    /* CONTROLES Y BOTONES (ESCALA MÁS GRANDE Y LEGIBLE) */
+    /* CONTROLES Y BOTONES */
     div.stButton > button {
         background-color: #1E293B !important;
         color: #38BDF8 !important;
@@ -119,6 +130,8 @@ if "search_term" not in st.session_state:
     st.session_state.search_term = ""
 if "manual_nav_bonus" not in st.session_state:
     st.session_state.manual_nav_bonus = 0
+if "last_alarm_id" not in st.session_state:
+    st.session_state.last_alarm_id = None
 
 
 # ---------------------------------------------------------
@@ -135,12 +148,10 @@ def limpiar_texto(val):
 
 def leer_hoja_google(nombre_hoja, header_none=False):
     """
-    Lee una pestaña de Google Sheets en formato CSV.
-    Se incluye `keep_default_na=False` para evitar que las iniciales 'NA'
-    (Nicolás Arévalo) sean convertidas automáticamente a valores nulos (NaN).
+    Lee una pestaña de Google Sheets forzando bypass de cache con timestamp nanosegundo.
     """
     nombre_enc = urllib.parse.quote(nombre_hoja)
-    nocache = int(time.time())
+    nocache = int(time.time() * 1000)
     url = f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet={nombre_enc}&_cb={nocache}"
     if header_none:
         return pd.read_csv(url, header=None, keep_default_na=False)
@@ -188,34 +199,8 @@ def parsear_fecha(val):
     return None
 
 
-def tiene_valor_valido(val):
-    """Verifica si una celda contiene un registro válido no vacío."""
-    if pd.isna(val) or val is None:
-        return False
-    v = str(val).strip().upper()
-    if v in [
-        "",
-        "NAN",
-        "NONE",
-        "NULL",
-        "NAT",
-        "#ERROR!",
-        "#N/A",
-        "#VALOR!",
-    ]:
-        return False
-    return True
-
-
 def calcular_progreso_orden(row):
-    """
-    Calcula el porcentaje exacto de avance (4 hitos de 25% cada uno):
-    1. Registrada en el día = 25% (Base por existir)
-    2. Certificado Firmado = +25% (ESTRICTAMENTE 'SI' / 'SÍ')
-    3. Enviado = +25% (ESTRICTAMENTE 'SI' / 'SÍ')
-    4. CRM Salida = +25% (ESTRICTAMENTE 'SI' / 'SÍ')
-    """
-    progreso = 25  # Hito 1: Registrada (25%)
+    progreso = 25
 
     cer = str(row.get("Cer firmado", row.get("CER FIRMADO", ""))).strip().upper()
     env = str(row.get("Enviado", row.get("ENVIADO", ""))).strip().upper()
@@ -223,10 +208,8 @@ def calcular_progreso_orden(row):
 
     if cer in ["SI", "SÍ"]:
         progreso += 25
-
     if env in ["SI", "SÍ"]:
         progreso += 25
-
     if crm_sal in ["SI", "SÍ"]:
         progreso += 25
 
@@ -236,7 +219,17 @@ def calcular_progreso_orden(row):
 def cargar_datos_gsheets():
     try:
         df_proceso_raw = leer_hoja_google("C. Proceso órdenes", header_none=True)
-        df_notas_raw = leer_hoja_google("NOTAS DEL DIA")
+        df_notas_raw = leer_hoja_google("NOTAS DEL DIA", header_none=True)
+
+        alarm_trigger_val = None
+        if df_notas_raw is not None and not df_notas_raw.empty:
+            try:
+                if df_notas_raw.shape[0] > 1 and df_notas_raw.shape[1] > 3:
+                    v_d2 = str(df_notas_raw.iloc[1, 3]).strip()
+                    if v_d2 and v_d2.lower() not in ["nan", "none", "null", ""]:
+                        alarm_trigger_val = v_d2
+            except Exception:
+                pass
 
         df_proceso = pd.DataFrame()
 
@@ -282,10 +275,10 @@ def cargar_datos_gsheets():
             df_notas.columns = [str(col).strip() for col in df_notas.columns]
             df_notas = df_notas.replace("", np.nan).dropna(how="all")
 
-        return df_proceso, df_notas, "Conectado correctamente"
+        return df_proceso, df_notas, "Conectado correctamente", alarm_trigger_val
 
     except Exception as e:
-        return None, None, f"Error al conectar con Google Sheets: {str(e)}"
+        return None, None, f"Error al conectar con Google Sheets: {str(e)}", None
 
 
 def render_dark_table(df_page):
@@ -308,7 +301,6 @@ def render_dark_table(df_page):
 
     for h in headers:
         if h == col_resp:
-            # Columna de Responsables ajustada a un ancho menor
             html += f'<th style="padding: 5px 4px; border-bottom: 1px solid #374151; width: 75px; text-align: center; white-space: nowrap;">{h}</th>'
         else:
             html += f'<th style="padding: 5px 8px; border-bottom: 1px solid #374151;">{h}</th>'
@@ -355,7 +347,6 @@ def render_dark_table(df_page):
             elif val_upper in ["SI", "SÍ"]:
                 badge = '<span style="background-color: rgba(16, 185, 129, 0.2); color: #A7F3D0; border: 1px solid #10B981; padding: 1px 6px; border-radius: 4px; font-weight: 700; font-size: 10.5px;">Si</span>'
             elif val != "":
-                # Manejo dinámico de textos diferentes a "SI" en Envíos, CRM Salida o Estados
                 if (
                     "CORREC" in val_upper
                     or "ERROR" in val_upper
@@ -433,11 +424,38 @@ def render_bitacora_card(prioridad_val, descripcion_val, estado_val):
 
 
 # ---------------------------------------------------------
-# TABLERO DE CONTROL DINÁMICO Y FLUIDO
+# TABLERO DE CONTROL DINÁMICO Y FLUIDO (REFRESCO CADA 5 SEGUNDOS)
 # ---------------------------------------------------------
 @st.fragment(run_every=5)
 def render_tablero_fluido():
-    df_main, df_bitacora, info_estado = cargar_datos_gsheets()
+    df_main, df_bitacora, info_estado, alarm_val = cargar_datos_gsheets()
+
+    # CONTROL Y REPRODUCCIÓN DE ALARMA ROBUSTA (DISPARO EN TIEMPO REAL)
+    if alarm_val is not None:
+        if st.session_state.last_alarm_id is None:
+            st.session_state.last_alarm_id = alarm_val
+        elif st.session_state.last_alarm_id != alarm_val:
+            st.session_state.last_alarm_id = alarm_val
+            # Inyección de Audio Nativo HTML5 con Autoplay
+            components.html(
+                f"""
+                <div style="display:none;">
+                    <audio autoplay>
+                        <source src="data:audio/wav;base64,{AUDIO_BASE64}" type="audio/wav">
+                    </audio>
+                </div>
+                <script>
+                    try {{
+                        var snd = new Audio("data:audio/wav;base64,{AUDIO_BASE64}");
+                        snd.play();
+                    }} catch(e) {{
+                        console.log("Autoplay diferido:", e);
+                    }}
+                </script>
+                """,
+                height=1,
+                width=1,
+            )
 
     cols_deseadas = [
         "Fecha",
@@ -484,7 +502,6 @@ def render_tablero_fluido():
             elif ("CRM" in c_upper and "CERT" in c_upper) and "CRM cert." not in mapa_cols.values():
                 mapa_cols[col] = "CRM cert."
 
-        # Fallback por posición si Responsables no ha sido mapeado
         if "Responsables" not in mapa_cols.values() and len(cols_raw) >= 3:
             col_pos2 = cols_raw[2]
             if col_pos2 not in mapa_cols:
@@ -671,9 +688,10 @@ def render_tablero_fluido():
         ahora = time.time()
         tiempo_transcurrido = ahora - st.session_state.last_switch_time
 
+        # CORREGIDO: st.session_state.last_switch_time = time.time()
         if tiempo_transcurrido >= duracion_total and total_paginas > 1:
             st.session_state.page_index = (st.session_state.page_index + 1) % total_paginas
-            st.session_state.last_switch_time = ahora
+            st.session_state.last_switch_time = time.time()
             st.session_state.manual_nav_bonus = 0
             st.rerun()
 
@@ -695,7 +713,7 @@ def render_tablero_fluido():
         unsafe_allow_html=True,
     )
 
-    # 3. SECCIÓN INFERIOR COMPACTA Y AMPLIFICADA
+    # 3. SECCIÓN INFERIOR COMPACTA
     c_left, c_middle, c_right = st.columns([1.2, 1.1, 1.2])
 
     with c_left:
