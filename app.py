@@ -102,7 +102,7 @@ def inject_custom_css():
         .badge-aprobacion { background-color: #78350F; color: #FDE68A; border: 1px solid #F59E0B; }
         .badge-correccion { background-color: #1E3A8A; color: #BFDBFE; border: 1px solid #3B82F6; }
 
-        /* Estilos de Sección Inferior / Tarjetas de Bitácora */
+        /* Estilos de Sección Inferior / Tarjetas de Notas */
         .section-card {
             background-color: #111827;
             border: 1px solid #1F2937;
@@ -123,7 +123,7 @@ def inject_custom_css():
             justify-content: space-between;
         }
 
-        /* Badges Dinámicos para la Bitácora segun colores de Excel */
+        /* Contenedores de las Notas del Día con borde dinámico */
         .bitacora-item {
             border-radius: 8px;
             padding: 12px;
@@ -147,32 +147,37 @@ def inject_custom_css():
             line-height: 1.35;
         }
         
-        /* Prioridades basadas en Excel */
-        .prio-urgente { background-color: #451A1A; border-left-color: #EF4444; }
-        .prio-normal { background-color: #1E293B; border-left-color: #3B82F6; }
-        .prio-revision { background-color: #452700; border-left-color: #F97316; }
-        .prio-auditoria { background-color: #3B0764; border-left-color: #A855F7; }
+        /* Prioridades basadas estrictamente en la paleta visual de Excel */
+        .prio-urgente { background-color: #2D1517; border-left-color: #EF4444; }
+        .prio-normal { background-color: #0F2942; border-left-color: #3B82F6; }
+        .prio-revision { background-color: #312E17; border-left-color: #F59E0B; }
+        .prio-auditoria { background-color: #261633; border-left-color: #A855F7; }
 
+        /* Badges de Prioridad replicando el formato de celda de Excel */
         .tag-prio {
-            padding: 2px 8px;
+            padding: 3px 10px;
             border-radius: 4px;
-            font-size: 0.7rem;
-            font-weight: 700;
-            letter-spacing: 0.03em;
+            font-size: 0.72rem;
+            font-weight: 800;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
         }
-        .tag-urgente { background-color: #7F1D1D; color: #FCA5A5; border: 1px solid #EF4444; }
-        .tag-normal { background-color: #1E3A8A; color: #BFDBFE; border: 1px solid #3B82F6; }
-        .tag-revision { background-color: #7C2D12; color: #FFEDD5; border: 1px solid #F97316; }
-        .tag-auditoria { background-color: #581C87; color: #F3E8FF; border: 1px solid #A855F7; }
+        .tag-urgente { background-color: #FCA5A5; color: #7F1D1D; border: 1px solid #EF4444; }
+        .tag-normal { background-color: #BFDBFE; color: #1E3A8A; border: 1px solid #3B82F6; }
+        .tag-revision { background-color: #FDE68A; color: #78350F; border: 1px solid #F59E0B; }
+        .tag-auditoria { background-color: #E9D5FF; color: #581C87; border: 1px solid #A855F7; }
 
+        /* Badges de Estado replicando los colores condicionales de Excel */
         .tag-estado {
-            padding: 2px 8px;
+            padding: 3px 10px;
             border-radius: 4px;
-            font-size: 0.7rem;
-            font-weight: 700;
+            font-size: 0.72rem;
+            font-weight: 800;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
         }
-        .estado-pendiente { background-color: #7F1D1D; color: #FECACA; }
-        .estado-realizado { background-color: #14532D; color: #86EFAC; }
+        .estado-pendiente { background-color: #FECACA; color: #991B1B; border: 1px solid #F87171; }
+        .estado-realizado { background-color: #BBF7D0; color: #14532D; border: 1px solid #4ADE80; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -206,11 +211,11 @@ def cargar_datos_gsheets():
         else:
             df_ordenes = pd.DataFrame()
 
-        # 2. Cargar Bitácora / Notas del Día
+        # 2. Cargar Notas del Día
         df_notas = conn.read(worksheet="NOTAS DEL DIA", ttl="5s")
         if df_notas is not None and not df_notas.empty:
             df_notas = df_notas.dropna(how="all")
-            # Renombrar columnas si vienen con espacios
+            # Renombrar columnas para eliminar espacios accidentales
             df_notas.columns = [str(col).strip() for col in df_notas.columns]
         else:
             df_notas = pd.DataFrame()
@@ -377,21 +382,22 @@ def render_meta_dia(df):
 
 def render_bitacora_card(df_notas):
     """
-    Renderiza la sección 'Bitácora y Avisos del Día' detectando automáticamente
-    las prioridades (URGENTE, NORMAL, REVISIÓN, AUDITORÍA) y estados (PENDIENTE, REALIZADO)
-    para asignar el color exacto definido en el Excel original.
+    Renderiza la sección 'NOTAS DEL DÍA' (pestaña Excel NOTAS DEL DIA)
+    detectando dinámicamente las prioridades (URGENTE, NORMAL, REVISIÓN, AUDITORÍA) 
+    y estados (PENDIENTE, REALIZADO) para aplicar los colores exactos de la hoja de cálculo.
     """
     html = '''
     <div class="section-card">
         <div class="section-header">
-            <span>📝 Bitácora y Avisos del Día</span>
-            <span style="font-size: 0.75rem; color: #9CA3AF; font-weight: normal;">Gestión Diaria</span>
+            <span>📌 NOTAS DEL DÍA</span>
+            <span style="font-size: 0.75rem; color: #9CA3AF; font-weight: normal;">Hoja Excel: NOTAS DEL DIA</span>
         </div>
     '''
 
     if not df_notas.empty:
-        col_prio = [c for c in df_notas.columns if 'PRIORIDAD' in c.upper() or 'PO' in c.upper()]
-        col_desc = [c for c in df_notas.columns if 'DESCRIPCION' in c.upper() or 'DESCRIPCIÓN' in c.upper() or 'NOTA' in c.upper()]
+        # Búsqueda flexible de columnas para contemplar encabezados como "PO / PRIORIDA" o "DESCRIPCIÓN DE LA NOTA O AVISO"
+        col_prio = [c for c in df_notas.columns if any(k in c.upper() for k in ['PRIORID', 'PRIORIDA', 'PO', 'PRIO'])]
+        col_desc = [c for c in df_notas.columns if any(k in c.upper() for k in ['DESCRIP', 'NOTA', 'AVISO', 'DETALLE'])]
         col_est = [c for c in df_notas.columns if 'ESTADO' in c.upper()]
 
         c_prio = col_prio[0] if col_prio else df_notas.columns[0]
@@ -403,10 +409,10 @@ def render_bitacora_card(df_notas):
             descripcion = str(row.get(c_desc, '')).strip()
             estado_raw = str(row.get(c_est, '')).strip()
 
-            if not descripcion or pd.isna(descripcion) or descripcion.lower() == 'nan':
+            if not descripcion or pd.isna(descripcion) or descripcion.lower() in ['nan', 'none', '']:
                 continue
 
-            # Mapeo de estilos según la prioridad
+            # Mapeo de estilos según la prioridad definida en el Excel
             p_upper = prioridad_raw.upper()
             if "URGENTE" in p_upper:
                 item_class = "prio-urgente"
@@ -414,30 +420,33 @@ def render_bitacora_card(df_notas):
             elif "NORMAL" in p_upper:
                 item_class = "prio-normal"
                 tag_prio_class = "tag-normal"
-            elif "REVISI" in p_upper or "REVISÓN" in p_upper:
+            elif "REVISI" in p_upper:  # Cubre REVISIÓN y REVISION
                 item_class = "prio-revision"
                 tag_prio_class = "tag-revision"
-            elif "AUDITOR" in p_upper:
+            elif "AUDITOR" in p_upper: # Cubre AUDITORÍA y AUDITORIA
                 item_class = "prio-auditoria"
                 tag_prio_class = "tag-auditoria"
             else:
                 item_class = "prio-normal"
                 tag_prio_class = "tag-normal"
 
-            # Mapeo de estado
+            # Mapeo del estado según el formato condicional de Excel
             e_upper = estado_raw.upper()
             if "PENDIENTE" in e_upper:
                 tag_estado_class = "estado-pendiente"
-            elif "REALIZADO" in e_upper or "COMPLETADO" in e_upper:
+            elif "REALIZAD" in e_upper or "COMPLETAD" in e_upper: # Cubre REALIZADO, REALIZADA
                 tag_estado_class = "estado-realizado"
             else:
                 tag_estado_class = "estado-pendiente"
 
+            txt_prio = prioridad_raw if prioridad_raw and prioridad_raw.lower() != 'nan' else "NOTA"
+            txt_estado = estado_raw if estado_raw and estado_raw.lower() != 'nan' else "PENDIENTE"
+
             html += f'''
             <div class="bitacora-item {item_class}">
                 <div class="bitacora-header">
-                    <span class="tag-prio {tag_prio_class}">{prioridad_raw if prioridad_raw else "NOTA"}</span>
-                    <span class="tag-estado {tag_estado_class}">{estado_raw if estado_raw else "PENDIENTE"}</span>
+                    <span class="tag-prio {tag_prio_class}">{txt_prio}</span>
+                    <span class="tag-estado {tag_estado_class}">{txt_estado}</span>
                 </div>
                 <div class="bitacora-desc">{descripcion}</div>
             </div>
