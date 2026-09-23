@@ -15,19 +15,10 @@ st.set_page_config(
 st.markdown(
     """
 <style>
-    /* Ocultar la barra superior de Streamlit */
-    header, [data-testid="stHeader"] {
-        display: none !important;
-    }
-    .block-container {
-        padding-top: 1rem !important;
-        padding-bottom: 1rem !important;
-    }
+    header, [data-testid="stHeader"] { display: none !important; }
+    .block-container { padding-top: 1rem !important; padding-bottom: 1rem !important; }
 
-    .stApp {
-        background-color: #0B1120;
-        color: #F3F4F6;
-    }
+    .stApp { background-color: #0B1120; color: #F3F4F6; }
     
     .kpi-card {
         background-color: #111827;
@@ -45,11 +36,7 @@ st.markdown(
         text-transform: uppercase;
         margin-bottom: 4px;
     }
-    .kpi-value {
-        color: #FFFFFF;
-        font-size: 28px;
-        font-weight: 800;
-    }
+    .kpi-value { color: #FFFFFF; font-size: 28px; font-weight: 800; }
 
     .order-card {
         background-color: #1E293B;
@@ -62,7 +49,6 @@ st.markdown(
         font-size: 13.5px;
     }
 
-    /* ESTILO RESALTADO PARA NAVEGACIÓN */
     div.stButton > button {
         background-color: #1E293B !important;
         color: #38BDF8 !important;
@@ -83,7 +69,6 @@ st.markdown(
         cursor: pointer !important;
     }
 
-    /* ANIMACIÓN Y PARPADEO PARA FILAS CON "CORRECCIONES" */
     @keyframes pulse-correccion {
         0% { background-color: rgba(239, 68, 68, 0.12); }
         50% { background-color: rgba(239, 68, 68, 0.30); }
@@ -94,21 +79,10 @@ st.markdown(
         border-left: 5px solid #EF4444 !important;
     }
 
-    /* Scrollbar personalizada */
-    ::-webkit-scrollbar {
-        width: 6px;
-        height: 6px;
-    }
-    ::-webkit-scrollbar-track {
-        background: #0B1120;
-    }
-    ::-webkit-scrollbar-thumb {
-        background: #1F2937;
-        border-radius: 4px;
-    }
-    ::-webkit-scrollbar-thumb:hover {
-        background: #374151;
-    }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #0B1120; }
+    ::-webkit-scrollbar-thumb { background: #1F2937; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #374151; }
 
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
@@ -117,10 +91,8 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# ID del archivo de Google Sheets
 SPREADSHEET_ID = "1bNDr35UasLS5zly1Sbq2ykbtmsTn9Fy4"
 
-# Inicializar estados de sesión para navegación suave sin recarga de pantalla
 if "page_index" not in st.session_state:
   st.session_state.page_index = 0
 if "last_switch_time" not in st.session_state:
@@ -128,10 +100,9 @@ if "last_switch_time" not in st.session_state:
 
 
 # ---------------------------------------------------------
-# FUNCIONES AUXILIARES Y LECTURA INSTANTÁNEA
+# FUNCIONES AUXILIARES Y LECTURA
 # ---------------------------------------------------------
 def limpiar_numero(val):
-  """Elimina .0 de los números de orden y formatos numéricos."""
   if pd.isna(val) or val is None:
     return ""
   val_str = str(val).strip()
@@ -141,7 +112,6 @@ def limpiar_numero(val):
 
 
 def leer_hoja_google(nombre_hoja, header_none=False):
-  """Lectura directa sin caché para actualización instantánea."""
   nombre_enc = urllib.parse.quote(nombre_hoja)
   nocache = int(time.time())
   url = f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet={nombre_enc}&_cb={nocache}"
@@ -156,7 +126,10 @@ def parsear_fecha(val):
   if isinstance(val, (datetime, pd.Timestamp)):
     return val.date()
   val_str = str(val).strip()
-  if val_str.lower() in ["", "nan", "none", "nat", "null", "#error!"]:
+  if (
+      val_str.lower() in ["", "nan", "none", "nat", "null"]
+      or val_str.startswith("#")
+  ):
     return None
 
   try:
@@ -188,7 +161,7 @@ def parsear_fecha(val):
 
 
 def extraer_ordenes_calendario(df_raw, dia_hoy):
-  """Extrae las órdenes del día desde el bloque del calendario en la derecha del Excel."""
+  """Escanea dinámicamente el calendario multi-columna de Excel para el día de hoy."""
   ordenes = []
   if df_raw is None or df_raw.empty:
     return ordenes
@@ -203,18 +176,45 @@ def extraer_ordenes_calendario(df_raw, dia_hoy):
         val_cell = val_cell[:-2]
 
       if val_cell == target_str:
-        for sub_r in range(r_idx + 1, min(r_idx + 25, len(df_raw))):
-          cell_ord = str(df_raw.iloc[sub_r, c_idx]).strip()
-          cell_ord_clean = limpiar_numero(cell_ord)
+        # Detectar todas las subcolumnas asociadas a este día (ej. día 23 abarca 2 columnas)
+        cols_del_dia = [c_idx]
+        for c_next in range(c_idx + 1, len(row_vals)):
+          val_next = str(row_vals[c_next]).strip()
+          if val_next.endswith(".0"):
+            val_next = val_next[:-2]
+          if val_next.isdigit() and val_next != target_str:
+            break
+          cols_del_dia.append(c_next)
+          if len(cols_del_dia) >= 2:
+            break
 
+        # Leer verticalmente las órdenes en las subcolumnas detectadas
+        for sub_r in range(r_idx + 1, min(r_idx + 25, len(df_raw))):
+          row_sub = df_raw.iloc[sub_r]
+
+          cell_chk = str(row_sub.iloc[c_idx]).strip()
+          if cell_chk.endswith(".0"):
+            cell_chk = cell_chk[:-2]
           if (
-              cell_ord_clean
-              and cell_ord_clean.lower()
-              not in ["nan", "none", "null", "nat", "#error!"]
-              and not cell_ord_clean.startswith("#")
+              cell_chk.isdigit()
+              and cell_chk != target_str
+              and 1 <= int(cell_chk) <= 31
           ):
-            if cell_ord_clean not in ordenes:
-              ordenes.append(cell_ord_clean)
+            break
+
+          for c_col in cols_del_dia:
+            cell_ord = str(row_sub.iloc[c_col]).strip()
+            cell_ord_clean = limpiar_numero(cell_ord)
+
+            if (
+                cell_ord_clean
+                and cell_ord_clean.lower()
+                not in ["nan", "none", "null", "nat"]
+                and not cell_ord_clean.startswith("#")
+                and not cell_ord_clean.startswith("=")
+            ):
+              if cell_ord_clean not in ordenes:
+                ordenes.append(cell_ord_clean)
 
   return ordenes
 
@@ -230,12 +230,10 @@ def cargar_datos_gsheets():
     dia_actual = hoy_dt.day
 
     if df_proceso_raw is not None and not df_proceso_raw.empty:
-      # 1. Extraer órdenes desde el calendario del lado derecho
       ordenes_calendario = extraer_ordenes_calendario(
           df_proceso_raw, dia_actual
       )
 
-      # 2. Localizar tabla principal
       header_idx = None
       for idx, row in df_proceso_raw.iterrows():
         row_str = " ".join(row.dropna().astype(str)).upper()
@@ -264,9 +262,8 @@ def cargar_datos_gsheets():
         if col_fecha != "Fecha":
           df_proceso.rename(columns={col_fecha: "Fecha"}, inplace=True)
         df_proceso["Fecha"] = df_proceso["Fecha"].replace(
-            ["", "nan", "none", "null", "nat", "#error!", "NaN"], np.nan
+            ["", "nan", "none", "null", "nat", "NaN"], np.nan
         )
-        df_proceso["Fecha"] = df_proceso["Fecha"].ffill()
 
     df_notas = pd.DataFrame()
     if df_notas_raw is not None and not df_notas_raw.empty:
@@ -336,7 +333,15 @@ def render_dark_table(df_page):
 
     es_correccion = "CORREC" in cer_val
     cer_es_si = cer_val in ["SI", "SÍ"]
-    crm_vacio = crm_sal_val in ["", "nan", "none", "null", "None"]
+    crm_vacio = crm_sal_val in [
+        "",
+        "nan",
+        "none",
+        "null",
+        "None",
+        "PENDIENTE",
+        "Pendiente",
+    ]
     es_atascada = cer_es_si and crm_vacio
 
     if es_correccion:
@@ -354,11 +359,9 @@ def render_dark_table(df_page):
 
       if h == col_orden and es_atascada:
         badge = f'{val} <span style="background-color: rgba(245, 158, 11, 0.25); color: #FBBF24; border: 1px solid #F59E0B; padding: 2px 7px; border-radius: 8px; font-weight: 700; font-size: 10.5px; margin-left: 6px;" title="Certificado firmado pero sin registro de CRM Salida">⚠️ Atascada</span>'
-      elif h == col_crm_salida and es_atascada and not val:
-        badge = '<span style="color: #F59E0B; font-weight: 700; font-size: 11px;">⚠️ Pendiente salida</span>'
       elif val.upper() in ["SI", "SÍ"]:
         badge = '<span style="background-color: rgba(16, 185, 129, 0.2); color: #A7F3D0; border: 1px solid #10B981; padding: 2px 8px; border-radius: 10px; font-weight: 700; font-size: 11px;">Si</span>'
-      elif "APROBAC" in val.upper():
+      elif "APROBAC" in val.upper() or "PENDIENTE" in val.upper():
         badge = f'<span style="background-color: rgba(245, 158, 11, 0.2); color: #FDE68A; border: 1px solid #F59E0B; padding: 2px 8px; border-radius: 10px; font-weight: 600; font-size: 11px;">{val}</span>'
       elif "CORREC" in val.upper():
         badge = f'<span style="background-color: rgba(239, 68, 68, 0.35); color: #FCA5A5; border: 1px solid #EF4444; padding: 2px 8px; border-radius: 10px; font-weight: 800; font-size: 11px;">{val} ⚠️</span>'
@@ -392,8 +395,6 @@ def render_bitacora_card(prioridad_val, descripcion_val, estado_val):
       "AVISO": "#3B82F6",
       "NORMAL": "#6B7280",
       "MANTENIMIENTO": "#10B981",
-      "AUDITORÍA": "#8B5CF6",
-      "AUDITORIA": "#8B5CF6",
   }
   border_color = priority_colors.get(prioridad, "#3B82F6")
 
@@ -413,11 +414,6 @@ def render_bitacora_card(prioridad_val, descripcion_val, estado_val):
           "text": "#A7F3D0",
           "border": "#10B981",
       },
-      "CANCELADO": {
-          "bg": "rgba(107, 114, 128, 0.2)",
-          "text": "#D1D5DB",
-          "border": "#6B7280",
-      },
   }
   s_style = status_styles.get(
       estado,
@@ -428,7 +424,7 @@ def render_bitacora_card(prioridad_val, descripcion_val, estado_val):
 
 
 # ---------------------------------------------------------
-# TABLERO DE CONTROL (FRAGMENTO SUAVE SIN RECARGA DE NAVEGADOR)
+# TABLERO DE CONTROL DINÁMICO
 # ---------------------------------------------------------
 @st.fragment(run_every=5)
 def render_tablero_fluido():
@@ -530,6 +526,30 @@ def render_tablero_fluido():
     if "Fecha" in df_vista.columns:
       df_vista["Fecha_dt"] = df_vista["Fecha"].apply(parsear_fecha)
 
+      # Unificar órdenes del calendario de hoy
+      ordenes_hoy = list(dict.fromkeys(ordenes_cal or []))
+
+      # Actualizar dinámicamente las órdenes del calendario para darles la fecha de HOY en la tabla principal
+      for ord_n in ordenes_hoy:
+        idx_match = df_vista[df_vista[col_ord_main] == ord_n].index
+        if len(idx_match) > 0:
+          df_vista.loc[idx_match, "Fecha_dt"] = hoy_dt
+        else:
+          # Si la orden programada no existe aún en la lista principal, crear fila sintética
+          nueva_fila = {
+              "Fecha": fecha_activa_str,
+              col_ord_main: ord_n,
+              "Cer firmado": "Pendiente",
+              "Enviado": "Pendiente",
+              "CRM salida": "Pendiente",
+              "Aprob. Comercial": "Pendiente",
+              "CRM cert.": "P. aprobación",
+              "Fecha_dt": hoy_dt,
+          }
+          df_vista = pd.concat(
+              [df_vista, pd.DataFrame([nueva_fila])], ignore_index=True
+          )
+
       total_reg = len(df_vista)
       if "Cer firmado" in df_vista.columns:
         total_firm = (
@@ -551,27 +571,11 @@ def render_tablero_fluido():
         )
       total_pend = max(0, total_reg - total_env)
 
-      # Sincronización: Ordenes de hoy desde la tabla principal + del calendario del Excel
-      df_hoy_tabla = df_vista[df_vista["Fecha_dt"] == hoy_dt]
-      ordenes_hoy_tabla = []
-      if not df_hoy_tabla.empty:
-        for o in df_hoy_tabla[col_ord_main].dropna().tolist():
-          o_s = limpiar_numero(o)
-          if o_s and o_s.lower() != "nan":
-            ordenes_hoy_tabla.append(o_s)
-
-      comb_ordenes = list(
-          dict.fromkeys((ordenes_cal or []) + ordenes_hoy_tabla)
-      )
-      ordenes_hoy = [o for o in comb_ordenes if o]
-
       total_hoy = len(ordenes_hoy)
 
       if total_hoy > 0 and not df_vista.empty:
-        df_vista_temp = df_vista.copy()
-
         for ord_n in ordenes_hoy:
-          match_row = df_vista_temp[df_vista_temp[col_ord_main] == ord_n]
+          match_row = df_vista[df_vista[col_ord_main] == ord_n]
           if not match_row.empty:
             if "Enviado" in match_row.columns and str(
                 match_row["Enviado"].values[0]
@@ -584,7 +588,7 @@ def render_tablero_fluido():
 
         porcentaje_hoy = int((cumplidos_hoy / total_hoy) * 100)
 
-      # Ordenar para ver siempre el día actual en la primera página
+      # Ordenar por fecha descendente para ver HOY en la Página 1 obligatoriamente
       df_vista = df_vista.sort_values(
           by=["Fecha_dt", col_ord_main], ascending=[False, True]
       ).reset_index(drop=True)
@@ -626,7 +630,7 @@ def render_tablero_fluido():
 
   st.markdown("<br>", unsafe_allow_html=True)
 
-  # 2. CONTROL DE PAGINACIÓN Y ROTACIÓN CADA 90 SEGUNDOS
+  # 2. TABLA PRINCIPAL CON NAVEGACIÓN Y ROTACIÓN
   if df_vista is not None and not df_vista.empty:
     filas_por_pagina = 8
     total_filas = len(df_vista)
@@ -776,5 +780,4 @@ def render_tablero_fluido():
         st.info("No hay descripciones activas en la tabla de notas.")
 
 
-# Ejecutar el tablero fluido
 render_tablero_fluido()
