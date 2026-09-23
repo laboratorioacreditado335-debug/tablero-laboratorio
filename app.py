@@ -1,7 +1,6 @@
+import urllib.parse
 from datetime import datetime
 import time
-import urllib.parse
-import numpy as np
 import pandas as pd
 import streamlit as st
 
@@ -15,11 +14,22 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
+
+# ==========================================
+# HELPER PARA COMPRIMIR Y LIMPIAR HTML
+# ==========================================
+def clean_html(html_str: str) -> str:
+    """
+    Elimina los espacios/sangrías iniciales de cada línea en cadenas HTML.
+    Esto evita que Streamlit interprete el HTML como bloque de código Markdown (<pre><code>).
+    """
+    return "".join(line.strip() for line in html_str.splitlines())
+
+
 # ==========================================
 # 2. ESTILOS CSS PERSONALIZADOS (MODO OSCURO)
 # ==========================================
-st.markdown(
-    """
+CSS_STYLES = clean_html("""
 <style>
     /* Ocultar elementos nativos de Streamlit */
     #MainMenu {visibility: hidden;}
@@ -147,22 +157,30 @@ st.markdown(
         color: #F3F4F6 !important;
     }
 </style>
-""",
-    unsafe_allow_html=True,
-)
+""")
+
+st.markdown(CSS_STYLES, unsafe_allow_html=True)
 
 
 # ==========================================
 # 3. LECTURA Y PROCESAMIENTO DE GOOGLE SHEETS
 # ==========================================
+def obtener_spreadsheet_id():
+    """Busca defensivamente el SPREADSHEET_ID en st.secrets o estructuras anidadas."""
+    try:
+        if "SPREADSHEET_ID" in st.secrets:
+            return st.secrets["SPREADSHEET_ID"]
+        for key in st.secrets:
+            if isinstance(st.secrets[key], dict) and "SPREADSHEET_ID" in st.secrets[key]:
+                return st.secrets[key]["SPREADSHEET_ID"]
+    except Exception:
+        pass
+    return None
+
+
 def cargar_datos_gsheets():
     try:
-        # Verificación segura de la existencia de SPREADSHEET_ID
-        spreadsheet_id = None
-        if "SPREADSHEET_ID" in st.secrets:
-            spreadsheet_id = st.secrets["SPREADSHEET_ID"]
-        elif "google" in st.secrets and "SPREADSHEET_ID" in st.secrets["google"]:
-            spreadsheet_id = st.secrets["google"]["SPREADSHEET_ID"]
+        spreadsheet_id = obtener_spreadsheet_id()
 
         if not spreadsheet_id:
             st.error(
@@ -207,7 +225,7 @@ def cargar_datos_gsheets():
             if pd.isna(val) or val == "" or str(val).strip().lower() in ["nan", "none", "null"]:
                 return None
             val_str = str(val).strip()
-            
+
             # Intentar número serial de Excel
             try:
                 num_val = float(val_str)
@@ -216,7 +234,7 @@ def cargar_datos_gsheets():
             except (ValueError, TypeError):
                 pass
 
-            # Intentar formatos comunes de string
+            # Intentar formatos habituales de texto
             for fmt in ("%d/%m/%Y", "%Y-%m-%d", "%d-%m-%Y", "%m/%d/%Y"):
                 try:
                     return pd.to_datetime(val_str, format=fmt)
@@ -240,7 +258,7 @@ def cargar_datos_gsheets():
         return df_proceso, df_notas, col_ord
 
     except Exception as e:
-        st.error(f"Error de conexión con Google Sheets: {e}")
+        st.error(f"Error al conectar con Google Sheets: {e}")
         return pd.DataFrame(), pd.DataFrame(), "# Orden"
 
 
@@ -249,7 +267,49 @@ def cargar_datos_gsheets():
 # ==========================================
 def render_dark_table(df_display, col_ord_name):
     """Genera la tabla HTML interactiva respetando los estilos del tablero."""
-    html = """
+    rows_html = ""
+    for _, row in df_display.iterrows():
+        def clean_val(v):
+            if pd.isna(v) or str(v).strip().lower() in ["nan", "none", "null"]:
+                return ""
+            return str(v).strip()
+
+        fecha = clean_val(row.get("Fecha", ""))
+        orden = clean_val(row.get(col_ord_name, ""))
+        cer_firm = clean_val(row.get("Cer firmado", ""))
+        enviado = clean_val(row.get("Enviado", ""))
+        crm_salida = clean_val(row.get("CRM salida", ""))
+        aprob_com = clean_val(row.get("Aprob. Comercial", ""))
+        crm_cert = clean_val(row.get("CRM cert.", ""))
+
+        cer_upper = cer_firm.upper()
+        env_upper = enviado.upper()
+
+        if "CORRECCI" in cer_upper or "CORRECCI" in env_upper:
+            badge = '<span class="badge badge-correccion">⚠️ Corrección</span>'
+        elif cer_upper in ["SI", "SÍ"] and env_upper not in ["SI", "SÍ"]:
+            badge = '<span class="badge badge-atascada">🚨 Atascada</span>'
+        elif aprob_com.upper() in ["PENDIENTE", "REVISIÓN", "REVISION", "P. APROBACIÓN", "P. APROBACION"]:
+            badge = '<span class="badge badge-aprobacion">⏳ Aprobación</span>'
+        elif env_upper in ["SI", "SÍ"]:
+            badge = '<span class="badge badge-ok">✅ Completada</span>'
+        else:
+            badge = '<span class="badge badge-proceso">⚙️ En Proceso</span>'
+
+        rows_html += f"""
+        <tr style="border-bottom: 1px solid #1F2937; transition: background-color 0.15s;" onmouseover="this.style.backgroundColor='#1E293B'" onmouseout="this.style.backgroundColor='transparent'">
+            <td style="padding: 9px 14px; color: #9CA3AF;">{fecha}</td>
+            <td style="padding: 9px 14px; font-weight: 700; color: #60A5FA;">{orden}</td>
+            <td style="padding: 9px 14px;">{cer_firm}</td>
+            <td style="padding: 9px 14px;">{enviado}</td>
+            <td style="padding: 9px 14px; color: #9CA3AF;">{crm_salida}</td>
+            <td style="padding: 9px 14px; color: #9CA3AF;">{aprob_com}</td>
+            <td style="padding: 9px 14px; color: #9CA3AF;">{crm_cert}</td>
+            <td style="padding: 9px 14px;">{badge}</td>
+        </tr>
+        """
+
+    full_html = f"""
     <div style="overflow-x: auto; border: 1px solid #1F2937; border-radius: 8px; background-color: #111827; margin-bottom: 8px;">
         <table style="width: 100%; border-collapse: collapse; color: #F3F4F6; font-size: 13px; text-align: left;">
             <thead>
@@ -265,51 +325,17 @@ def render_dark_table(df_display, col_ord_name):
                 </tr>
             </thead>
             <tbody>
+                {rows_html}
+            </tbody>
+        </table>
+    </div>
     """
-
-    for _, row in df_display.iterrows():
-        fecha = str(row.get("Fecha", ""))
-        orden = str(row.get(col_ord_name, ""))
-        cer_firm = str(row.get("Cer firmado", ""))
-        enviado = str(row.get("Enviado", ""))
-        crm_salida = str(row.get("CRM salida", ""))
-        aprob_com = str(row.get("Aprob. Comercial", ""))
-        crm_cert = str(row.get("CRM cert.", ""))
-
-        cer_upper = cer_firm.upper().strip()
-        env_upper = enviado.upper().strip()
-
-        if "CORRECCI" in cer_upper or "CORRECCI" in env_upper:
-            badge = '<span class="badge badge-correccion">⚠️ Corrección</span>'
-        elif cer_upper in ["SI", "SÍ"] and env_upper not in ["SI", "SÍ"]:
-            badge = '<span class="badge badge-atascada">🚨 Atascada</span>'
-        elif aprob_com.upper().strip() in ["PENDIENTE", "REVISIÓN", "REVISION"]:
-            badge = '<span class="badge badge-aprobacion">⏳ Aprobación</span>'
-        elif env_upper in ["SI", "SÍ"]:
-            badge = '<span class="badge badge-ok">✅ Completada</span>'
-        else:
-            badge = '<span class="badge badge-proceso">⚙️ En Proceso</span>'
-
-        html += f"""
-        <tr style="border-bottom: 1px solid #1F2937; transition: background-color 0.15s;" onmouseover="this.style.backgroundColor='#1E293B'" onmouseout="this.style.backgroundColor='transparent'">
-            <td style="padding: 9px 14px; color: #9CA3AF;">{fecha}</td>
-            <td style="padding: 9px 14px; font-weight: 700; color: #60A5FA;">{orden}</td>
-            <td style="padding: 9px 14px;">{cer_firm}</td>
-            <td style="padding: 9px 14px;">{enviado}</td>
-            <td style="padding: 9px 14px; color: #9CA3AF;">{crm_salida}</td>
-            <td style="padding: 9px 14px; color: #9CA3AF;">{aprob_com}</td>
-            <td style="padding: 9px 14px; color: #9CA3AF;">{crm_cert}</td>
-            <td style="padding: 9px 14px;">{badge}</td>
-        </tr>
-        """
-
-    html += "</tbody></table></div>"
-    return html
+    return clean_html(full_html)
 
 
 def render_bitacora_card(prioridad, mensaje, hora=""):
     prioridad_cls = prioridad.lower()
-    return f"""
+    html_card = f"""
     <div class="bitacora-card {prioridad_cls}">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
             <span style="font-weight: 700; color: #F3F4F6;">📌 Prioridad: {prioridad.upper()}</span>
@@ -318,6 +344,7 @@ def render_bitacora_card(prioridad, mensaje, hora=""):
         <div style="color: #D1D5DB;">{mensaje}</div>
     </div>
     """
+    return clean_html(html_card)
 
 
 # ==========================================
@@ -325,7 +352,6 @@ def render_bitacora_card(prioridad, mensaje, hora=""):
 # ==========================================
 @st.fragment(run_every=5)
 def render_tablero_fluido():
-    # Carga silenciosa sin refresco de página completa
     df_proceso, df_notas, col_ord_main = cargar_datos_gsheets()
 
     if df_proceso.empty:
@@ -377,14 +403,19 @@ def render_tablero_fluido():
     col_h1, col_h2 = st.columns([3, 1])
     with col_h1:
         st.markdown(
-            f"<h2 style='margin:0; font-weight:800; color:#F3F4F6;'>🔬 TABLERO DE CONTROL DE CALIBRACIÓN</h2>"
-            f"<p style='margin:0; font-size:12px; color:#9CA3AF;'>Monitoreo de flujo de trabajo | Actualización fluida activa</p>",
+            clean_html("""
+            <h2 style='margin:0; font-weight:800; color:#F3F4F6;'>🔬 TABLERO DE CONTROL DE CALIBRACIÓN</h2>
+            <p style='margin:0; font-size:12px; color:#9CA3AF;'>Monitoreo de flujo de trabajo | Actualización fluida activa</p>
+            """),
             unsafe_allow_html=True,
         )
     with col_h2:
         st.markdown(
-            f"<div style='text-align: right; font-size: 11px; color: #6B7280; margin-top: 5px;'>"
-            f"Última sincro: <b>{datetime.now().strftime('%H:%M:%S')}</b></div>",
+            clean_html(f"""
+            <div style='text-align: right; font-size: 11px; color: #6B7280; margin-top: 5px;'>
+                Última sincro: <b>{datetime.now().strftime('%H:%M:%S')}</b>
+            </div>
+            """),
             unsafe_allow_html=True,
         )
 
@@ -393,22 +424,22 @@ def render_tablero_fluido():
     kpi1, kpi2, kpi3, kpi4 = st.columns(4)
     with kpi1:
         st.markdown(
-            f'<div class="kpi-card"><div class="kpi-title">REGISTRADAS</div><div class="kpi-value" style="color:#60A5FA;">{total_registradas}</div></div>',
+            clean_html(f'<div class="kpi-card"><div class="kpi-title">REGISTRADAS</div><div class="kpi-value" style="color:#60A5FA;">{total_registradas}</div></div>'),
             unsafe_allow_html=True,
         )
     with kpi2:
         st.markdown(
-            f'<div class="kpi-card"><div class="kpi-title">FIRMADA Y REVISADA</div><div class="kpi-value" style="color:#F59E0B;">{total_firmadas}</div></div>',
+            clean_html(f'<div class="kpi-card"><div class="kpi-title">FIRMADA Y REVISADA</div><div class="kpi-value" style="color:#F59E0B;">{total_firmadas}</div></div>'),
             unsafe_allow_html=True,
         )
     with kpi3:
         st.markdown(
-            f'<div class="kpi-card"><div class="kpi-title">ENVIADAS</div><div class="kpi-value" style="color:#10B981;">{total_enviadas}</div></div>',
+            clean_html(f'<div class="kpi-card"><div class="kpi-title">ENVIADAS</div><div class="kpi-value" style="color:#10B981;">{total_enviadas}</div></div>'),
             unsafe_allow_html=True,
         )
     with kpi4:
         st.markdown(
-            f'<div class="kpi-card"><div class="kpi-title">PENDIENTES / ATASCADAS</div><div class="kpi-value" style="color:#EF4444;">{total_pendientes}</div></div>',
+            clean_html(f'<div class="kpi-card"><div class="kpi-title">PENDIENTES / ATASCADAS</div><div class="kpi-value" style="color:#EF4444;">{total_pendientes}</div></div>'),
             unsafe_allow_html=True,
         )
 
@@ -474,8 +505,11 @@ def render_tablero_fluido():
             st.session_state.last_page_rotation = time.time()
     with b_col3:
         st.markdown(
-            f"<div style='text-align: right; padding-top: 6px; font-size: 12px; color: #9CA3AF;'>"
-            f"Página <b>{st.session_state.pagina_actual}</b> de <b>{total_paginas}</b> ({total_filas} registros)</div>",
+            clean_html(f"""
+            <div style='text-align: right; padding-top: 6px; font-size: 12px; color: #9CA3AF;'>
+                Página <b>{st.session_state.pagina_actual}</b> de <b>{total_paginas}</b> ({total_filas} registros)
+            </div>
+            """),
             unsafe_allow_html=True,
         )
 
@@ -489,7 +523,7 @@ def render_tablero_fluido():
         lambda d: d.strftime("%d/%m/%Y") if pd.notna(d) and d is not None else ""
     )
 
-    # Renderizado de la tabla HTML
+    # Renderizado de la tabla HTML (Limpiada con clean_html)
     st.markdown(
         render_dark_table(df_pagina, col_ord_main), unsafe_allow_html=True
     )
@@ -516,10 +550,10 @@ def render_tablero_fluido():
             for ord_item in ordenes_hoy_list:
                 html_prog += f"<div style='padding: 4px 8px; border-bottom: 1px solid #1F2937; font-size: 12px; color: #60A5FA; font-weight: 600;'>📦 Orden #{ord_item}</div>"
             html_prog += "</div>"
-            st.markdown(html_prog, unsafe_allow_html=True)
+            st.markdown(clean_html(html_prog), unsafe_allow_html=True)
         else:
             st.markdown(
-                "<div style='background-color: #111827; border: 1px solid #1F2937; border-radius: 8px; padding: 12px; color: #9CA3AF; font-size: 12px; text-align: center;'>No hay órdenes agendadas para hoy.</div>",
+                clean_html("<div style='background-color: #111827; border: 1px solid #1F2937; border-radius: 8px; padding: 12px; color: #9CA3AF; font-size: 12px; text-align: center;'>No hay órdenes agendadas para hoy.</div>"),
                 unsafe_allow_html=True,
             )
 
@@ -595,7 +629,7 @@ def render_tablero_fluido():
             </div>
         </div>
         """
-        st.markdown(meta_html, unsafe_allow_html=True)
+        st.markdown(clean_html(meta_html), unsafe_allow_html=True)
 
     # --- COLUMNA 3: BITÁCORA / AVISOS DEL DÍA ---
     with col_bot3:
@@ -612,7 +646,7 @@ def render_tablero_fluido():
                 if msg:
                     html_notas += render_bitacora_card(prio, msg, hora)
             html_notas += "</div>"
-            st.markdown(html_notas, unsafe_allow_html=True)
+            st.markdown(clean_html(html_notas), unsafe_allow_html=True)
         else:
             st.markdown(
                 render_bitacora_card(
