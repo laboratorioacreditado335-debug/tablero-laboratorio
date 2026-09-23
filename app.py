@@ -1,12 +1,12 @@
-from datetime import datetime
 import time
 import urllib.parse
+from datetime import datetime
 import numpy as np
 import pandas as pd
 import streamlit as st
 
 # ---------------------------------------------------------
-# CONFIGURACIÓN DE PÁGINA Y ESTILOS MODO OSCURO INTEGRAL
+# CONFIGURACIÓN DE PÁGINA Y ESTILOS MODO OSCURO (MICRO-COMPACTO FORZADO A 10 FILAS)
 # ---------------------------------------------------------
 st.set_page_config(
     page_title="Tablero de Control - Laboratorio", page_icon="📊", layout="wide"
@@ -15,83 +15,79 @@ st.set_page_config(
 st.markdown(
     """
 <style>
+    /* OCULTAR ENCABEZADOS Y MARGEN DE PÁGINA ULTRA-REDUCIDO */
     header, [data-testid="stHeader"] { display: none !important; }
-    .block-container { padding-top: 0.4rem !important; padding-bottom: 0.4rem !important; }
+    .block-container { 
+        padding-top: 0.1rem !important; 
+        padding-bottom: 0.1rem !important; 
+        padding-left: 0.8rem !important;
+        padding-right: 0.8rem !important;
+    }
 
     .stApp { background-color: #0B1120; color: #F3F4F6; }
     
-    /* COMPACTACIÓN DE TARJETAS KPI */
+    /* TARJETAS KPI COMPACTAS */
     .kpi-card {
         background-color: #111827;
         border: 1px solid #1F2937;
-        border-radius: 8px;
-        padding: 8px 12px;
+        border-radius: 5px;
+        padding: 3px 6px;
         text-align: center;
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.4);
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
     }
     .kpi-title {
         color: #9CA3AF;
-        font-size: 11px;
+        font-size: 9.5px;
         font-weight: 700;
-        letter-spacing: 0.8px;
+        letter-spacing: 0.5px;
         text-transform: uppercase;
-        margin-bottom: 2px;
+        margin-bottom: 0px;
     }
-    .kpi-value { color: #FFFFFF; font-size: 24px; font-weight: 800; }
+    .kpi-value { color: #FFFFFF; font-size: 18px; font-weight: 800; line-height: 1.1; }
 
-    /* TARJETAS DE ÓRDENES Y SECCIÓN INFERIOR SIN SCROLLBAR */
-    .order-card {
-        background-color: #1E293B;
-        border-left: 4px solid #3B82F6;
-        border-radius: 6px;
-        padding: 6px 12px;
-        margin-bottom: 6px;
-        font-weight: 600;
-        color: #F8FAFC;
-        font-size: 13px;
-    }
-
-    /* TARJETA DE PROGRESO DE ETAPA POR ÓRDEN */
+    /* TARJETAS DE PROGRESO DE ETAPA POR ÓRDEN (MÁS COMPACTAS) */
     .progress-order-card {
         background-color: #111827;
         border: 1px solid #1F2937;
-        border-radius: 6px;
-        padding: 6px 10px;
-        margin-bottom: 6px;
+        border-radius: 4px;
+        padding: 3px 6px;
+        margin-bottom: 2px;
     }
 
+    /* CONTROLES Y CONTENEDORES COMPACTOS */
     div.stButton > button {
         background-color: #1E293B !important;
         color: #38BDF8 !important;
         border: 1px solid #3B82F6 !important;
-        border-radius: 6px !important;
+        border-radius: 4px !important;
         font-weight: 700 !important;
-        font-size: 12.5px !important;
-        padding: 4px 12px !important;
+        font-size: 11px !important;
+        padding: 1px 6px !important;
         width: 100% !important;
+        height: 28px !important;
         transition: all 0.2s ease-in-out !important;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3) !important;
     }
     div.stButton > button:hover {
         background-color: #2563EB !important;
         color: #FFFFFF !important;
         border-color: #60A5FA !important;
-        box-shadow: 0 0 12px rgba(59, 130, 246, 0.6) !important;
         cursor: pointer !important;
     }
 
-    /* ESTILO INTEGRADO PARA EL CAMPO DE BÚSQUEDA */
+    /* CAMPO DE BÚSQUEDA COMPACTO */
     div[data-baseweb="input"] {
         background-color: #111827 !important;
         border: 1px solid #3B82F6 !important;
-        border-radius: 6px !important;
+        border-radius: 4px !important;
+        height: 28px !important;
     }
     div[data-baseweb="input"] input {
         color: #F3F4F6 !important;
-        font-size: 13px !important;
-        padding: 4px 8px !important;
+        font-size: 11.5px !important;
+        padding: 1px 5px !important;
     }
 
+    /* ANIMACIÓN PARPADEO PARALELO CORRECCIÓN */
     @keyframes pulse-correccion {
         0% { background-color: rgba(239, 68, 68, 0.12); }
         50% { background-color: rgba(239, 68, 68, 0.30); }
@@ -99,13 +95,12 @@ st.markdown(
     }
     .row-correccion {
         animation: pulse-correccion 2.2s infinite !important;
-        border-left: 5px solid #EF4444 !important;
+        border-left: 3px solid #EF4444 !important;
     }
 
-    ::-webkit-scrollbar { width: 5px; height: 5px; }
+    ::-webkit-scrollbar { width: 4px; height: 4px; }
     ::-webkit-scrollbar-track { background: #0B1120; }
     ::-webkit-scrollbar-thumb { background: #1F2937; border-radius: 4px; }
-    ::-webkit-scrollbar-thumb:hover { background: #374151; }
 
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
@@ -125,7 +120,7 @@ if "search_term" not in st.session_state:
 
 
 # ---------------------------------------------------------
-# FUNCIONES AUXILIARES Y PARSER ROBUSTO DE FECHAS
+# FUNCIONES AUXILIARES Y PARSER DE DATOS
 # ---------------------------------------------------------
 def limpiar_texto(val):
     if pd.isna(val) or val is None:
@@ -159,7 +154,6 @@ def parsear_fecha(val):
     ):
         return None
 
-    # Número de serie Excel (ej. 46288)
     try:
         num_val = float(val_str)
         if 30000 < num_val < 70000:
@@ -170,7 +164,6 @@ def parsear_fecha(val):
 
     val_clean = val_str.split(" ")[0].strip()
 
-    # M/D/YYYY o YYYY-MM-DD
     try:
         dt = pd.to_datetime(val_clean, dayfirst=False, errors="coerce")
         if pd.notna(dt):
@@ -178,7 +171,6 @@ def parsear_fecha(val):
     except Exception:
         pass
 
-    # D/M/YYYY
     try:
         dt = pd.to_datetime(val_clean, dayfirst=True, errors="coerce")
         if pd.notna(dt):
@@ -191,33 +183,38 @@ def parsear_fecha(val):
 
 def calcular_progreso_orden(row):
     """
-    Calcula el porcentaje de avance por etapas de una orden hacia CRM Salida (100%):
-    1. Registrada = 20%
-    2. Aprobación Comercial = +20% (40%)
-    3. Certificado Firmado = +20% (60%)
-    4. CRM Certificado = +20% (80%)
-    5. CRM Salida / Sede de Salida = +20% (100%)
+    Calcula el porcentaje de avance por etapas de una orden (4 hitos de 25% c/u):
+    1. Registrada / Creada = 25% (Base por estar en la lista del día)
+    2. Certificado Firmado = +25% (50%)
+    3. Enviado = +25% (75%)
+    4. CRM Salida = +25% (100%)
     """
-    progreso = 20  # Base por estar registrada
+    progreso = 25  # Base inicial por estar creada / registrada
 
-    aprob = str(row.get("Aprob. Comercial", "")).strip().upper()
-    cer = str(row.get("Cer firmado", "")).strip().upper()
-    crm_cert = str(row.get("CRM cert.", "")).strip().upper()
-    crm_sal = str(row.get("CRM salida", "")).strip().upper()
+    def es_positivo(val):
+        if pd.isna(val) or val is None:
+            return False
+        v = str(val).strip().upper()
+        return v in ["SI", "SÍ", "OK", "APROBADO", "FIRMADO", "ENVIADO", "DESPACHADO", "TRUE", "1"]
 
-    if aprob in ["SI", "SÍ", "APROBADO", "OK"] or (
-        aprob and aprob not in ["NO", "PENDIENTE", "NAN", "NONE", "", "0"]
-    ):
-        progreso += 20
+    def tiene_registro_valido(val):
+        if pd.isna(val) or val is None:
+            return False
+        v = str(val).strip().upper()
+        return v not in ["", "NAN", "NONE", "PENDIENTE", "NO", "0", "NULL", "NAT"]
 
-    if cer in ["SI", "SÍ", "APROBADO", "OK"]:
-        progreso += 20
+    cer = row.get("Cer firmado", row.get("CER FIRMADO", ""))
+    env = row.get("Enviado", row.get("ENVIADO", ""))
+    crm_sal = row.get("CRM salida", row.get("CRM SALIDA", ""))
 
-    if crm_cert and crm_cert not in ["", "NAN", "NONE", "PENDIENTE", "NO", "0"]:
-        progreso += 20
+    if es_positivo(cer):
+        progreso += 25
 
-    if crm_sal and crm_sal not in ["", "NAN", "NONE", "PENDIENTE", "NO", "0"]:
-        progreso += 20
+    if es_positivo(env):
+        progreso += 25
+
+    if tiene_registro_valido(crm_sal):
+        progreso += 25
 
     return min(100, progreso)
 
@@ -279,7 +276,7 @@ def cargar_datos_gsheets():
 
 def render_dark_table(df_page):
     if df_page.empty:
-        return "<div style='color: #9CA3AF; text-align: center; padding: 15px;'>Sin datos o registros coincidentes con la búsqueda.</div>"
+        return "<div style='color: #9CA3AF; text-align: center; padding: 6px; font-size: 11px;'>Sin datos o registros coincidentes.</div>"
 
     headers = list(df_page.columns)
 
@@ -291,10 +288,10 @@ def render_dark_table(df_page):
     )
     col_orden = next((c for c in headers if "ORDEN" in c.upper()), None)
 
-    html = '<div style="overflow-x: auto; border: 1px solid #1F2937; border-radius: 8px; background-color: #111827; margin-bottom: 6px;"><table style="width: 100%; border-collapse: collapse; color: #F3F4F6; font-size: 12.5px; text-align: left;"><thead><tr style="background-color: #1F2937; color: #9CA3AF; font-weight: 700; text-transform: uppercase; font-size: 10.5px; letter-spacing: 0.5px;">'
+    html = '<div style="overflow-x: auto; border: 1px solid #1F2937; border-radius: 5px; background-color: #111827; margin-bottom: 2px;"><table style="width: 100%; border-collapse: collapse; color: #F3F4F6; font-size: 11px; text-align: left;"><thead><tr style="background-color: #1F2937; color: #9CA3AF; font-weight: 700; text-transform: uppercase; font-size: 9.5px; letter-spacing: 0.5px;">'
 
     for h in headers:
-        html += f'<th style="padding: 6px 10px; border-bottom: 1px solid #374151;">{h}</th>'
+        html += f'<th style="padding: 3px 6px; border-bottom: 1px solid #374151;">{h}</th>'
     html += "</tr></thead><tbody>"
 
     for idx, row in df_page.iterrows():
@@ -328,7 +325,7 @@ def render_dark_table(df_page):
                 'style="border-bottom: 1px solid #EF4444;" class="row-correccion"'
             )
         elif es_atascada:
-            tr_style = 'style="border-bottom: 1px solid #F59E0B; background-color: rgba(245, 158, 11, 0.08); border-left: 4px solid #F59E0B;"'
+            tr_style = 'style="border-bottom: 1px solid #F59E0B; background-color: rgba(245, 158, 11, 0.08); border-left: 3px solid #F59E0B;"'
         else:
             tr_style = 'style="border-bottom: 1px solid #1F2937;"'
 
@@ -337,17 +334,17 @@ def render_dark_table(df_page):
             val = limpiar_texto(row[h])
 
             if h == col_orden and es_atascada:
-                badge = f'{val} <span style="background-color: rgba(245, 158, 11, 0.25); color: #FBBF24; border: 1px solid #F59E0B; padding: 1px 5px; border-radius: 6px; font-weight: 700; font-size: 9.5px; margin-left: 4px;" title="Certificado firmado pero sin registro de CRM Salida">⚠️ Atascada</span>'
+                badge = f'{val} <span style="background-color: rgba(245, 158, 11, 0.25); color: #FBBF24; border: 1px solid #F59E0B; padding: 0px 3px; border-radius: 3px; font-weight: 700; font-size: 8.5px;" title="Certificado firmado pero sin registro de CRM Salida">⚠️ Atascada</span>'
             elif val.upper() in ["SI", "SÍ"]:
-                badge = '<span style="background-color: rgba(16, 185, 129, 0.2); color: #A7F3D0; border: 1px solid #10B981; padding: 1px 6px; border-radius: 8px; font-weight: 700; font-size: 10px;">Si</span>'
+                badge = '<span style="background-color: rgba(16, 185, 129, 0.2); color: #A7F3D0; border: 1px solid #10B981; padding: 0px 4px; border-radius: 4px; font-weight: 700; font-size: 9px;">Si</span>'
             elif "APROBAC" in val.upper() or "PENDIENTE" in val.upper():
-                badge = f'<span style="background-color: rgba(245, 158, 11, 0.2); color: #FDE68A; border: 1px solid #F59E0B; padding: 1px 6px; border-radius: 8px; font-weight: 600; font-size: 10px;">{val}</span>'
+                badge = f'<span style="background-color: rgba(245, 158, 11, 0.2); color: #FDE68A; border: 1px solid #F59E0B; padding: 0px 4px; border-radius: 4px; font-weight: 600; font-size: 9px;">{val}</span>'
             elif "CORREC" in val.upper():
-                badge = f'<span style="background-color: rgba(239, 68, 68, 0.35); color: #FCA5A5; border: 1px solid #EF4444; padding: 1px 6px; border-radius: 8px; font-weight: 800; font-size: 10px;">{val} ⚠️</span>'
+                badge = f'<span style="background-color: rgba(239, 68, 68, 0.35); color: #FCA5A5; border: 1px solid #EF4444; padding: 0px 4px; border-radius: 4px; font-weight: 800; font-size: 9px;">{val} ⚠️</span>'
             else:
                 badge = val
 
-            html += f'<td style="padding: 5px 10px;">{badge}</td>'
+            html += f'<td style="padding: 2px 6px;">{badge}</td>'
         html += "</tr>"
 
     html += "</tbody></table></div>"
@@ -399,7 +396,7 @@ def render_bitacora_card(prioridad_val, descripcion_val, estado_val):
         {"bg": "rgba(107, 114, 128, 0.2)", "text": "#E5E7EB", "border": "#9CA3AF"},
     )
 
-    return f'<div style="background: #111827; border-left: 4px solid {border_color}; border-radius: 6px; padding: 8px 12px; margin-bottom: 6px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3); display: flex; justify-content: space-between; align-items: center; gap: 10px;"><div style="color: #F3F4F6; font-size: 12.5px; font-weight: 500; line-height: 1.3; flex-grow: 1;">{descripcion}</div><div style="background-color: {s_style["bg"]}; color: {s_style["text"]}; border: 1px solid {s_style["border"]}; font-size: 10.5px; font-weight: 700; padding: 3px 8px; border-radius: 10px; letter-spacing: 0.5px; white-space: nowrap;">{estado}</div></div>'
+    return f'<div style="background: #111827; border-left: 3px solid {border_color}; border-radius: 4px; padding: 4px 6px; margin-bottom: 2px; display: flex; justify-content: space-between; align-items: center; gap: 6px;"><div style="color: #F3F4F6; font-size: 11px; font-weight: 500; line-height: 1.15; flex-grow: 1;">{descripcion}</div><div style="background-color: {s_style["bg"]}; color: {s_style["text"]}; border: 1px solid {s_style["border"]}; font-size: 9px; font-weight: 700; padding: 1px 5px; border-radius: 6px; white-space: nowrap;">{estado}</div></div>'
 
 
 # ---------------------------------------------------------
@@ -431,7 +428,6 @@ def render_tablero_fluido():
     total_pend = 0
 
     if df_main is not None and not df_main.empty:
-        # Mapeo de columnas dinámico
         mapa_cols = {}
         for col in df_main.columns:
             c_upper = str(col).upper()
@@ -482,7 +478,6 @@ def render_tablero_fluido():
             else cols_existentes[min(1, len(cols_existentes) - 1)]
         )
 
-        # 1. PROPAGACIÓN VERTICAL DE FECHAS (FFILL PARA CELDAS COMBINADAS EN EXCEL)
         if "Fecha" in df_vista.columns:
             df_vista["Fecha_Raw"] = df_vista["Fecha"].astype(str).str.strip()
             df_vista["Fecha_Raw"] = df_vista["Fecha_Raw"].replace(
@@ -502,7 +497,6 @@ def render_tablero_fluido():
             )
             df_vista["Fecha_Raw"] = df_vista["Fecha_Raw"].ffill()
 
-        # 2. FILTRADO DE FILAS VÁLIDAS DE ÓRDENES
         df_vista[col_ord_main] = df_vista[col_ord_main].apply(limpiar_texto)
         df_vista = df_vista[
             df_vista[col_ord_main].notna()
@@ -518,7 +512,6 @@ def render_tablero_fluido():
         if "Fecha_Raw" in df_vista.columns:
             df_vista["Fecha_dt"] = df_vista["Fecha_Raw"].apply(parsear_fecha)
 
-            # Formato de visualización de fecha
             def formatear_fecha_mostrar(row):
                 dt = row["Fecha_dt"]
                 if pd.notna(dt) and dt is not None:
@@ -528,7 +521,6 @@ def render_tablero_fluido():
 
             df_vista["Fecha"] = df_vista.apply(formatear_fecha_mostrar, axis=1)
 
-            # Totales KPIs Globales
             total_reg = len(df_vista)
             if "Cer firmado" in df_vista.columns:
                 total_firm = (
@@ -550,7 +542,6 @@ def render_tablero_fluido():
                 )
             total_pend = max(0, total_reg - total_env)
 
-            # OBTENER ÓRDENES DE HOY DESDE EXCEL (O ÚLTIMA FECHA DISPONIBLE)
             df_hoy = df_vista[df_vista["Fecha_dt"] == hoy_dt].copy()
 
             if df_hoy.empty and not df_vista["Fecha_dt"].dropna().empty:
@@ -562,7 +553,6 @@ def render_tablero_fluido():
 
             total_hoy = len(df_hoy)
 
-            # Ordenar por fecha descendente
             df_vista = df_vista.sort_values(
                 by=["Fecha_dt", col_ord_main], ascending=[False, True]
             ).reset_index(drop=True)
@@ -594,11 +584,11 @@ def render_tablero_fluido():
             unsafe_allow_html=True,
         )
 
-    st.markdown("<div style='margin-bottom: 6px;'></div>", unsafe_allow_html=True)
+    st.markdown("<div style='margin-bottom: 2px;'></div>", unsafe_allow_html=True)
 
-    # 2. TABLA PRINCIPAL CON NAVEGACIÓN Y BUSCADOR
+    # 2. TABLA PRINCIPAL CON CONTROLES Y BUSCADOR
     if df_vista is not None and not df_vista.empty:
-        col_btn1, col_btn2, col_search, col_info = st.columns([1.1, 1.1, 1.8, 2.5])
+        col_btn1, col_btn2, col_search, col_info = st.columns([1, 1, 1.8, 2.5])
 
         with col_btn1:
             if st.button("⬆️ Subir"):
@@ -622,7 +612,6 @@ def render_tablero_fluido():
             )
             st.session_state.search_term = search_val
 
-        # FILTRADO POR BÚSQUEDA
         if st.session_state.search_term.strip():
             term = st.session_state.search_term.strip().lower()
             col_target = "# Orden" if "# Orden" in df_vista.columns else df_vista.columns[0]
@@ -630,14 +619,12 @@ def render_tablero_fluido():
                 df_vista[col_target].astype(str).str.lower().str.contains(term, na=False)
             ]
 
-        # PAGINACIÓN DE 10 ÓRDENES POR PÁGINA
+        # REQUISITO EXPLICITO: 10 FILAS EN PANTALLA
         filas_por_pagina = 10
         total_filas = len(df_vista)
         total_paginas = max(1, (total_filas + filas_por_pagina - 1) // filas_por_pagina)
 
         ahora = time.time()
-
-        # CONFIGURACIÓN DE TIEMPOS: PÁGINA 1 DURA 120s (2 MIN), OTRAS PÁGINAS DURAN 60s (1 MIN)
         tiempo_permanencia = 120 if st.session_state.page_index == 0 else 60
 
         if (ahora - st.session_state.last_switch_time) >= tiempo_permanencia and total_paginas > 1:
@@ -650,8 +637,8 @@ def render_tablero_fluido():
         with col_info:
             segundos_restantes = max(0, int(tiempo_permanencia - (ahora - st.session_state.last_switch_time)))
             st.caption(
-                f"Pág. {st.session_state.page_index + 1}/{total_paginas} ({total_filas} registros)"
-                f" | ⏱️ Rotación en {segundos_restantes}s"
+                f"Pág. {st.session_state.page_index + 1}/{total_paginas} ({total_filas} reg.)"
+                f" | ⏱️ Rotación: {segundos_restantes}s"
             )
 
         p_idx = st.session_state.page_index
@@ -665,15 +652,15 @@ def render_tablero_fluido():
         st.error(f"⚠️ {info_estado}")
 
     st.markdown(
-        "<hr style='border-color: #1F2937; margin: 8px 0;'>",
+        "<hr style='border-color: #1F2937; margin: 2px 0;'>",
         unsafe_allow_html=True,
     )
 
-    # 3. SECCIÓN INFERIOR REORGANIZADA (PROGRAMADOS CON PROGRESO % + ASIGNACIONES + BITÁCORA)
+    # 3. SECCIÓN INFERIOR COMPACTA (3 COLUMNAS)
     c_left, c_middle, c_right = st.columns([1.2, 1.1, 1.2])
 
     with c_left:
-        st.markdown("<h4 style='margin:0 0 2px 0; font-size:14px; color:#F3F4F6;'>🚚 Programados del Día</h4>", unsafe_allow_html=True)
+        st.markdown("<h4 style='margin:0 0 1px 0; font-size:12px; color:#F3F4F6;'>🚚 Programados del Día</h4>", unsafe_allow_html=True)
         st.caption(f"🗓️ Fecha: **{fecha_activa_str}** | {total_hoy} órdenes")
         
         progresos = []
@@ -687,31 +674,29 @@ def render_tablero_fluido():
         if progresos:
             acumulado_general = int(np.mean([p[1] for p in progresos]))
             
-            # Resumen Promedio Acumulado del Día
             st.markdown(
-                f'<div style="background-color: #111827; border: 1px solid #1F2937; border-radius: 6px; padding: 8px 10px; margin-bottom: 8px;">'
-                f'<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">'
-                f'<span style="font-size: 11px; font-weight: 700; color: #9CA3AF; letter-spacing: 0.5px;">PROMEDIO DE AVANCE DÍA</span>'
-                f'<span style="font-size: 14px; font-weight: 800; color: #38BDF8;">{acumulado_general}%</span>'
+                f'<div style="background-color: #111827; border: 1px solid #1F2937; border-radius: 4px; padding: 3px 6px; margin-bottom: 3px;">'
+                f'<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1px;">'
+                f'<span style="font-size: 9.5px; font-weight: 700; color: #9CA3AF;">PROMEDIO DÍA</span>'
+                f'<span style="font-size: 11px; font-weight: 800; color: #38BDF8;">{acumulado_general}%</span>'
                 f'</div>'
-                f'<div style="background-color: #1F2937; border-radius: 10px; height: 8px; width: 100%; overflow: hidden;">'
-                f'<div style="background: linear-gradient(90deg, #3B82F6, #10B981); height: 100%; width: {acumulado_general}%; border-radius: 10px;"></div>'
+                f'<div style="background-color: #1F2937; border-radius: 4px; height: 5px; width: 100%; overflow: hidden;">'
+                f'<div style="background: linear-gradient(90deg, #3B82F6, #10B981); height: 100%; width: {acumulado_general}%;"></div>'
                 f'</div>'
                 f'</div>',
                 unsafe_allow_html=True,
             )
 
-            # Tarjetas individuales de órdenes del día con avance %
-            html_progresos = '<div style="display: flex; flex-direction: column; gap: 4px;">'
+            html_progresos = '<div style="display: flex; flex-direction: column; gap: 2px;">'
             for ord_num, pct in progresos:
-                bar_color = "#10B981" if pct == 100 else ("#3B82F6" if pct >= 60 else "#F59E0B")
+                bar_color = "#10B981" if pct == 100 else ("#3B82F6" if pct >= 50 else "#F59E0B")
                 html_progresos += (
                     f'<div class="progress-order-card">'
-                    f'<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">'
-                    f'<span style="font-size: 12px; font-weight: 700; color: #F3F4F6;">📦 Orden #{ord_num}</span>'
-                    f'<span style="font-size: 11.5px; font-weight: 800; color: {bar_color};">{pct}%</span>'
+                    f'<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1px;">'
+                    f'<span style="font-size: 10.5px; font-weight: 700; color: #F3F4F6;">📦 Orden #{ord_num}</span>'
+                    f'<span style="font-size: 10px; font-weight: 800; color: {bar_color};">{pct}%</span>'
                     f'</div>'
-                    f'<div style="background-color: #1F2937; border-radius: 6px; height: 6px; width: 100%; overflow: hidden;">'
+                    f'<div style="background-color: #1F2937; border-radius: 3px; height: 4px; width: 100%; overflow: hidden;">'
                     f'<div style="background-color: {bar_color}; height: 100%; width: {pct}%;"></div>'
                     f'</div>'
                     f'</div>'
@@ -722,22 +707,21 @@ def render_tablero_fluido():
             st.info(f"Sin órdenes programadas hoy ({fecha_activa_str}).")
 
     with c_middle:
-        st.markdown("<h4 style='margin:0 0 2px 0; font-size:14px; color:#F3F4F6;'>📋 Asignaciones del Día</h4>", unsafe_allow_html=True)
-        st.caption("Asignaciones de tareas y responsabilidades diarias")
+        st.markdown("<h4 style='margin:0 0 1px 0; font-size:12px; color:#F3F4F6;'>📋 Asignaciones del Día</h4>", unsafe_allow_html=True)
+        st.caption("Tareas y responsabilidades diarias")
         
-        # Tarjeta contenedora vacía y limpia lista para futuras integraciones
         st.markdown(
-            '<div style="background-color: #111827; border: 1px dashed #374151; border-radius: 8px; padding: 25px 15px; text-align: center; color: #9CA3AF; margin-top: 4px;">'
-            '<div style="font-size: 24px; margin-bottom: 8px;">📋</div>'
-            '<div style="font-size: 13px; font-weight: 600; color: #D1D5DB;">Sin asignaciones registradas por el momento</div>'
-            '<div style="font-size: 11px; margin-top: 4px; color: #6B7280;">Espacio listo para próxima integración de asignaciones</div>'
+            '<div style="background-color: #111827; border: 1px dashed #374151; border-radius: 5px; padding: 10px 8px; text-align: center; color: #9CA3AF; margin-top: 1px;">'
+            '<div style="font-size: 16px; margin-bottom: 2px;">📋</div>'
+            '<div style="font-size: 11px; font-weight: 600; color: #D1D5DB;">Sin asignaciones pendientes</div>'
+            '<div style="font-size: 9.5px; margin-top: 1px; color: #6B7280;">Espacio listo para próxima integración</div>'
             '</div>',
             unsafe_allow_html=True,
         )
 
     with c_right:
-        st.markdown("<h4 style='margin:0 0 2px 0; font-size:14px; color:#F3F4F6;'>📌 Bitácora / Avisos del Día</h4>", unsafe_allow_html=True)
-        st.caption("Avisos y notas registradas en tiempo real")
+        st.markdown("<h4 style='margin:0 0 1px 0; font-size:12px; color:#F3F4F6;'>📌 Bitácora / Avisos del Día</h4>", unsafe_allow_html=True)
+        st.caption("Notas registradas en tiempo real")
         
         if df_bitacora is None or df_bitacora.empty:
             st.info("Sin avisos en 'NOTAS DEL DIA'.")
@@ -746,7 +730,7 @@ def render_tablero_fluido():
             col_d = next((c for c in df_bitacora.columns if "DESCRIP" in str(c).upper() or "NOTA" in str(c).upper() or "AVISO" in str(c).upper()), None)
             col_e = next((c for c in df_bitacora.columns if "ESTADO" in str(c).upper()), None)
 
-            avisos_html = '<div style="display: flex; flex-direction: column; gap: 4px;">'
+            avisos_html = '<div style="display: flex; flex-direction: column; gap: 2px;">'
             avisos_cont = 0
             for _, row in df_bitacora.iterrows():
                 p_val = row[col_p] if col_p else "NORMAL"
