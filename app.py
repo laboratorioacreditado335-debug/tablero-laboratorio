@@ -1,12 +1,12 @@
+from datetime import datetime
 import time
 import urllib.parse
-from datetime import datetime
 import numpy as np
 import pandas as pd
 import streamlit as st
 
 # ---------------------------------------------------------
-# CONFIGURACIÓN DE PÁGINA Y ESTILOS MODO OSCURO (MICRO-COMPACTO FORZADO A 10 FILAS)
+# CONFIGURACIÓN DE PÁGINA Y ESTILOS MODO OSCURO (ESCALA 125% OPTIMIZADA)
 # ---------------------------------------------------------
 st.set_page_config(
     page_title="Tablero de Control - Laboratorio", page_icon="📊", layout="wide"
@@ -15,56 +15,56 @@ st.set_page_config(
 st.markdown(
     """
 <style>
-    /* OCULTAR ENCABEZADOS Y MARGEN DE PÁGINA ULTRA-REDUCIDO */
+    /* OCULTAR ENCABEZADOS Y AJUSTAR CONTENEDOR PRINCIPAL */
     header, [data-testid="stHeader"] { display: none !important; }
     .block-container { 
-        padding-top: 0.1rem !important; 
-        padding-bottom: 0.1rem !important; 
-        padding-left: 0.8rem !important;
-        padding-right: 0.8rem !important;
+        padding-top: 0.2rem !important; 
+        padding-bottom: 0.2rem !important; 
+        padding-left: 1rem !important;
+        padding-right: 1rem !important;
     }
 
-    .stApp { background-color: #0B1120; color: #F3F4F6; }
+    .stApp { background-color: #0B1120; color: #F3F4F6; font-size: 14px; }
     
-    /* TARJETAS KPI COMPACTAS */
+    /* TARJETAS KPI ESCALADAS (ZOOM 125%) */
     .kpi-card {
         background-color: #111827;
         border: 1px solid #1F2937;
-        border-radius: 5px;
-        padding: 3px 6px;
+        border-radius: 6px;
+        padding: 6px 10px;
         text-align: center;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.4);
     }
     .kpi-title {
         color: #9CA3AF;
-        font-size: 9.5px;
+        font-size: 11px;
         font-weight: 700;
         letter-spacing: 0.5px;
         text-transform: uppercase;
-        margin-bottom: 0px;
+        margin-bottom: 1px;
     }
-    .kpi-value { color: #FFFFFF; font-size: 18px; font-weight: 800; line-height: 1.1; }
+    .kpi-value { color: #FFFFFF; font-size: 22px; font-weight: 800; line-height: 1.1; }
 
-    /* TARJETAS DE PROGRESO DE ETAPA POR ÓRDEN (MÁS COMPACTAS) */
+    /* TARJETAS DE PROGRESO DE ETAPA POR ÓRDEN */
     .progress-order-card {
         background-color: #111827;
         border: 1px solid #1F2937;
-        border-radius: 4px;
-        padding: 3px 6px;
-        margin-bottom: 2px;
+        border-radius: 5px;
+        padding: 5px 8px;
+        margin-bottom: 3px;
     }
 
-    /* CONTROLES Y CONTENEDORES COMPACTOS */
+    /* CONTROLES Y BOTONES (ESCALA MÁS GRANDE Y LEGIBLE) */
     div.stButton > button {
         background-color: #1E293B !important;
         color: #38BDF8 !important;
         border: 1px solid #3B82F6 !important;
-        border-radius: 4px !important;
+        border-radius: 5px !important;
         font-weight: 700 !important;
-        font-size: 11px !important;
-        padding: 1px 6px !important;
+        font-size: 12.5px !important;
+        padding: 2px 8px !important;
         width: 100% !important;
-        height: 28px !important;
+        height: 34px !important;
         transition: all 0.2s ease-in-out !important;
     }
     div.stButton > button:hover {
@@ -74,17 +74,17 @@ st.markdown(
         cursor: pointer !important;
     }
 
-    /* CAMPO DE BÚSQUEDA COMPACTO */
+    /* CAMPO DE BÚSQUEDA ESCALADO */
     div[data-baseweb="input"] {
         background-color: #111827 !important;
         border: 1px solid #3B82F6 !important;
-        border-radius: 4px !important;
-        height: 28px !important;
+        border-radius: 5px !important;
+        height: 34px !important;
     }
     div[data-baseweb="input"] input {
         color: #F3F4F6 !important;
-        font-size: 11.5px !important;
-        padding: 1px 5px !important;
+        font-size: 13px !important;
+        padding: 2px 8px !important;
     }
 
     /* ANIMACIÓN PARPADEO PARALELO CORRECCIÓN */
@@ -95,10 +95,10 @@ st.markdown(
     }
     .row-correccion {
         animation: pulse-correccion 2.2s infinite !important;
-        border-left: 3px solid #EF4444 !important;
+        border-left: 4px solid #EF4444 !important;
     }
 
-    ::-webkit-scrollbar { width: 4px; height: 4px; }
+    ::-webkit-scrollbar { width: 5px; height: 5px; }
     ::-webkit-scrollbar-track { background: #0B1120; }
     ::-webkit-scrollbar-thumb { background: #1F2937; border-radius: 4px; }
 
@@ -181,39 +181,50 @@ def parsear_fecha(val):
     return None
 
 
+def tiene_valor_valido(val):
+    """Verifica si una celda contiene un registro o dato de avance válido."""
+    if pd.isna(val) or val is None:
+        return False
+    v = str(val).strip().upper()
+    if v in [
+        "",
+        "NAN",
+        "NONE",
+        "NULL",
+        "NAT",
+        "PENDIENTE",
+        "NO",
+        "0",
+        "FALSE",
+        "#ERROR!",
+        "#N/A",
+        "#VALOR!",
+    ]:
+        return False
+    return True
+
+
 def calcular_progreso_orden(row):
     """
-    Calcula el porcentaje de avance por etapas de una orden (4 hitos de 25% c/u):
-    1. Registrada / Creada = 25% (Base por estar en la lista del día)
+    Calcula el porcentaje exacto de avance (4 hitos de 25% cada uno):
+    1. Registrada en el día = 25% (Base por existir)
     2. Certificado Firmado = +25% (50%)
     3. Enviado = +25% (75%)
-    4. CRM Salida = +25% (100%)
+    4. CRM Salida = +25% (100% Completo)
     """
-    progreso = 25  # Base inicial por estar creada / registrada
-
-    def es_positivo(val):
-        if pd.isna(val) or val is None:
-            return False
-        v = str(val).strip().upper()
-        return v in ["SI", "SÍ", "OK", "APROBADO", "FIRMADO", "ENVIADO", "DESPACHADO", "TRUE", "1"]
-
-    def tiene_registro_valido(val):
-        if pd.isna(val) or val is None:
-            return False
-        v = str(val).strip().upper()
-        return v not in ["", "NAN", "NONE", "PENDIENTE", "NO", "0", "NULL", "NAT"]
+    progreso = 25  # Hito 1: Registrada
 
     cer = row.get("Cer firmado", row.get("CER FIRMADO", ""))
     env = row.get("Enviado", row.get("ENVIADO", ""))
     crm_sal = row.get("CRM salida", row.get("CRM SALIDA", ""))
 
-    if es_positivo(cer):
+    if tiene_valor_valido(cer):
         progreso += 25
 
-    if es_positivo(env):
+    if tiene_valor_valido(env):
         progreso += 25
 
-    if tiene_registro_valido(crm_sal):
+    if tiene_valor_valido(crm_sal):
         progreso += 25
 
     return min(100, progreso)
@@ -276,7 +287,7 @@ def cargar_datos_gsheets():
 
 def render_dark_table(df_page):
     if df_page.empty:
-        return "<div style='color: #9CA3AF; text-align: center; padding: 6px; font-size: 11px;'>Sin datos o registros coincidentes.</div>"
+        return "<div style='color: #9CA3AF; text-align: center; padding: 10px; font-size: 13px;'>Sin datos o registros coincidentes.</div>"
 
     headers = list(df_page.columns)
 
@@ -288,10 +299,10 @@ def render_dark_table(df_page):
     )
     col_orden = next((c for c in headers if "ORDEN" in c.upper()), None)
 
-    html = '<div style="overflow-x: auto; border: 1px solid #1F2937; border-radius: 5px; background-color: #111827; margin-bottom: 2px;"><table style="width: 100%; border-collapse: collapse; color: #F3F4F6; font-size: 11px; text-align: left;"><thead><tr style="background-color: #1F2937; color: #9CA3AF; font-weight: 700; text-transform: uppercase; font-size: 9.5px; letter-spacing: 0.5px;">'
+    html = '<div style="overflow-x: auto; border: 1px solid #1F2937; border-radius: 6px; background-color: #111827; margin-bottom: 4px;"><table style="width: 100%; border-collapse: collapse; color: #F3F4F6; font-size: 12.5px; text-align: left;"><thead><tr style="background-color: #1F2937; color: #9CA3AF; font-weight: 700; text-transform: uppercase; font-size: 11px; letter-spacing: 0.5px;">'
 
     for h in headers:
-        html += f'<th style="padding: 3px 6px; border-bottom: 1px solid #374151;">{h}</th>'
+        html += f'<th style="padding: 5px 8px; border-bottom: 1px solid #374151;">{h}</th>'
     html += "</tr></thead><tbody>"
 
     for idx, row in df_page.iterrows():
@@ -308,16 +319,7 @@ def render_dark_table(df_page):
 
         es_correccion = "CORREC" in cer_val
         cer_es_si = cer_val in ["SI", "SÍ"]
-        crm_vacio = crm_sal_val in [
-            "",
-            "nan",
-            "none",
-            "null",
-            "None",
-            "PENDIENTE",
-            "Pendiente",
-            "0",
-        ]
+        crm_vacio = not tiene_valor_valido(crm_sal_val)
         es_atascada = cer_es_si and crm_vacio
 
         if es_correccion:
@@ -325,7 +327,7 @@ def render_dark_table(df_page):
                 'style="border-bottom: 1px solid #EF4444;" class="row-correccion"'
             )
         elif es_atascada:
-            tr_style = 'style="border-bottom: 1px solid #F59E0B; background-color: rgba(245, 158, 11, 0.08); border-left: 3px solid #F59E0B;"'
+            tr_style = 'style="border-bottom: 1px solid #F59E0B; background-color: rgba(245, 158, 11, 0.08); border-left: 4px solid #F59E0B;"'
         else:
             tr_style = 'style="border-bottom: 1px solid #1F2937;"'
 
@@ -334,17 +336,17 @@ def render_dark_table(df_page):
             val = limpiar_texto(row[h])
 
             if h == col_orden and es_atascada:
-                badge = f'{val} <span style="background-color: rgba(245, 158, 11, 0.25); color: #FBBF24; border: 1px solid #F59E0B; padding: 0px 3px; border-radius: 3px; font-weight: 700; font-size: 8.5px;" title="Certificado firmado pero sin registro de CRM Salida">⚠️ Atascada</span>'
+                badge = f'{val} <span style="background-color: rgba(245, 158, 11, 0.25); color: #FBBF24; border: 1px solid #F59E0B; padding: 1px 5px; border-radius: 4px; font-weight: 700; font-size: 10px;" title="Certificado firmado pero sin registro de CRM Salida">⚠️ Atascada</span>'
             elif val.upper() in ["SI", "SÍ"]:
-                badge = '<span style="background-color: rgba(16, 185, 129, 0.2); color: #A7F3D0; border: 1px solid #10B981; padding: 0px 4px; border-radius: 4px; font-weight: 700; font-size: 9px;">Si</span>'
+                badge = '<span style="background-color: rgba(16, 185, 129, 0.2); color: #A7F3D0; border: 1px solid #10B981; padding: 1px 6px; border-radius: 4px; font-weight: 700; font-size: 10.5px;">Si</span>'
             elif "APROBAC" in val.upper() or "PENDIENTE" in val.upper():
-                badge = f'<span style="background-color: rgba(245, 158, 11, 0.2); color: #FDE68A; border: 1px solid #F59E0B; padding: 0px 4px; border-radius: 4px; font-weight: 600; font-size: 9px;">{val}</span>'
+                badge = f'<span style="background-color: rgba(245, 158, 11, 0.2); color: #FDE68A; border: 1px solid #F59E0B; padding: 1px 6px; border-radius: 4px; font-weight: 600; font-size: 10.5px;">{val}</span>'
             elif "CORREC" in val.upper():
-                badge = f'<span style="background-color: rgba(239, 68, 68, 0.35); color: #FCA5A5; border: 1px solid #EF4444; padding: 0px 4px; border-radius: 4px; font-weight: 800; font-size: 9px;">{val} ⚠️</span>'
+                badge = f'<span style="background-color: rgba(239, 68, 68, 0.35); color: #FCA5A5; border: 1px solid #EF4444; padding: 1px 6px; border-radius: 4px; font-weight: 800; font-size: 10.5px;">{val} ⚠️</span>'
             else:
                 badge = val
 
-            html += f'<td style="padding: 2px 6px;">{badge}</td>'
+            html += f'<td style="padding: 4px 8px;">{badge}</td>'
         html += "</tr>"
 
     html += "</tbody></table></div>"
@@ -396,7 +398,7 @@ def render_bitacora_card(prioridad_val, descripcion_val, estado_val):
         {"bg": "rgba(107, 114, 128, 0.2)", "text": "#E5E7EB", "border": "#9CA3AF"},
     )
 
-    return f'<div style="background: #111827; border-left: 3px solid {border_color}; border-radius: 4px; padding: 4px 6px; margin-bottom: 2px; display: flex; justify-content: space-between; align-items: center; gap: 6px;"><div style="color: #F3F4F6; font-size: 11px; font-weight: 500; line-height: 1.15; flex-grow: 1;">{descripcion}</div><div style="background-color: {s_style["bg"]}; color: {s_style["text"]}; border: 1px solid {s_style["border"]}; font-size: 9px; font-weight: 700; padding: 1px 5px; border-radius: 6px; white-space: nowrap;">{estado}</div></div>'
+    return f'<div style="background: #111827; border-left: 3px solid {border_color}; border-radius: 5px; padding: 5px 8px; margin-bottom: 3px; display: flex; justify-content: space-between; align-items: center; gap: 8px;"><div style="color: #F3F4F6; font-size: 12px; font-weight: 500; line-height: 1.2; flex-grow: 1;">{descripcion}</div><div style="background-color: {s_style["bg"]}; color: {s_style["text"]}; border: 1px solid {s_style["border"]}; font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 6px; white-space: nowrap;">{estado}</div></div>'
 
 
 # ---------------------------------------------------------
@@ -619,7 +621,7 @@ def render_tablero_fluido():
                 df_vista[col_target].astype(str).str.lower().str.contains(term, na=False)
             ]
 
-        # REQUISITO EXPLICITO: 10 FILAS EN PANTALLA
+        # 10 FILAS EN PANTALLA (REQUISITO MANTENIDO)
         filas_por_pagina = 10
         total_filas = len(df_vista)
         total_paginas = max(1, (total_filas + filas_por_pagina - 1) // filas_por_pagina)
@@ -652,15 +654,15 @@ def render_tablero_fluido():
         st.error(f"⚠️ {info_estado}")
 
     st.markdown(
-        "<hr style='border-color: #1F2937; margin: 2px 0;'>",
+        "<hr style='border-color: #1F2937; margin: 3px 0;'>",
         unsafe_allow_html=True,
     )
 
-    # 3. SECCIÓN INFERIOR COMPACTA (3 COLUMNAS)
+    # 3. SECCIÓN INFERIOR COMPACTA Y AMPLIFICADA
     c_left, c_middle, c_right = st.columns([1.2, 1.1, 1.2])
 
     with c_left:
-        st.markdown("<h4 style='margin:0 0 1px 0; font-size:12px; color:#F3F4F6;'>🚚 Programados del Día</h4>", unsafe_allow_html=True)
+        st.markdown("<h4 style='margin:0 0 1px 0; font-size:13.5px; color:#F3F4F6;'>🚚 Programados del Día</h4>", unsafe_allow_html=True)
         st.caption(f"🗓️ Fecha: **{fecha_activa_str}** | {total_hoy} órdenes")
         
         progresos = []
@@ -675,28 +677,28 @@ def render_tablero_fluido():
             acumulado_general = int(np.mean([p[1] for p in progresos]))
             
             st.markdown(
-                f'<div style="background-color: #111827; border: 1px solid #1F2937; border-radius: 4px; padding: 3px 6px; margin-bottom: 3px;">'
-                f'<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1px;">'
-                f'<span style="font-size: 9.5px; font-weight: 700; color: #9CA3AF;">PROMEDIO DÍA</span>'
-                f'<span style="font-size: 11px; font-weight: 800; color: #38BDF8;">{acumulado_general}%</span>'
+                f'<div style="background-color: #111827; border: 1px solid #1F2937; border-radius: 5px; padding: 4px 8px; margin-bottom: 4px;">'
+                f'<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px;">'
+                f'<span style="font-size: 10.5px; font-weight: 700; color: #9CA3AF;">PROMEDIO DÍA</span>'
+                f'<span style="font-size: 12.5px; font-weight: 800; color: #38BDF8;">{acumulado_general}%</span>'
                 f'</div>'
-                f'<div style="background-color: #1F2937; border-radius: 4px; height: 5px; width: 100%; overflow: hidden;">'
+                f'<div style="background-color: #1F2937; border-radius: 4px; height: 6px; width: 100%; overflow: hidden;">'
                 f'<div style="background: linear-gradient(90deg, #3B82F6, #10B981); height: 100%; width: {acumulado_general}%;"></div>'
                 f'</div>'
                 f'</div>',
                 unsafe_allow_html=True,
             )
 
-            html_progresos = '<div style="display: flex; flex-direction: column; gap: 2px;">'
+            html_progresos = '<div style="display: flex; flex-direction: column; gap: 3px;">'
             for ord_num, pct in progresos:
                 bar_color = "#10B981" if pct == 100 else ("#3B82F6" if pct >= 50 else "#F59E0B")
                 html_progresos += (
                     f'<div class="progress-order-card">'
-                    f'<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1px;">'
-                    f'<span style="font-size: 10.5px; font-weight: 700; color: #F3F4F6;">📦 Orden #{ord_num}</span>'
-                    f'<span style="font-size: 10px; font-weight: 800; color: {bar_color};">{pct}%</span>'
+                    f'<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px;">'
+                    f'<span style="font-size: 11.5px; font-weight: 700; color: #F3F4F6;">📦 Orden #{ord_num}</span>'
+                    f'<span style="font-size: 11px; font-weight: 800; color: {bar_color};">{pct}%</span>'
                     f'</div>'
-                    f'<div style="background-color: #1F2937; border-radius: 3px; height: 4px; width: 100%; overflow: hidden;">'
+                    f'<div style="background-color: #1F2937; border-radius: 3px; height: 5px; width: 100%; overflow: hidden;">'
                     f'<div style="background-color: {bar_color}; height: 100%; width: {pct}%;"></div>'
                     f'</div>'
                     f'</div>'
@@ -707,20 +709,20 @@ def render_tablero_fluido():
             st.info(f"Sin órdenes programadas hoy ({fecha_activa_str}).")
 
     with c_middle:
-        st.markdown("<h4 style='margin:0 0 1px 0; font-size:12px; color:#F3F4F6;'>📋 Asignaciones del Día</h4>", unsafe_allow_html=True)
+        st.markdown("<h4 style='margin:0 0 1px 0; font-size:13.5px; color:#F3F4F6;'>📋 Asignaciones del Día</h4>", unsafe_allow_html=True)
         st.caption("Tareas y responsabilidades diarias")
         
         st.markdown(
-            '<div style="background-color: #111827; border: 1px dashed #374151; border-radius: 5px; padding: 10px 8px; text-align: center; color: #9CA3AF; margin-top: 1px;">'
-            '<div style="font-size: 16px; margin-bottom: 2px;">📋</div>'
-            '<div style="font-size: 11px; font-weight: 600; color: #D1D5DB;">Sin asignaciones pendientes</div>'
-            '<div style="font-size: 9.5px; margin-top: 1px; color: #6B7280;">Espacio listo para próxima integración</div>'
+            '<div style="background-color: #111827; border: 1px dashed #374151; border-radius: 5px; padding: 12px 10px; text-align: center; color: #9CA3AF; margin-top: 2px;">'
+            '<div style="font-size: 18px; margin-bottom: 2px;">📋</div>'
+            '<div style="font-size: 12px; font-weight: 600; color: #D1D5DB;">Sin asignaciones pendientes</div>'
+            '<div style="font-size: 10.5px; margin-top: 1px; color: #6B7280;">Espacio listo para próxima integración</div>'
             '</div>',
             unsafe_allow_html=True,
         )
 
     with c_right:
-        st.markdown("<h4 style='margin:0 0 1px 0; font-size:12px; color:#F3F4F6;'>📌 Bitácora / Avisos del Día</h4>", unsafe_allow_html=True)
+        st.markdown("<h4 style='margin:0 0 1px 0; font-size:13.5px; color:#F3F4F6;'>📌 Bitácora / Avisos del Día</h4>", unsafe_allow_html=True)
         st.caption("Notas registradas en tiempo real")
         
         if df_bitacora is None or df_bitacora.empty:
@@ -730,7 +732,7 @@ def render_tablero_fluido():
             col_d = next((c for c in df_bitacora.columns if "DESCRIP" in str(c).upper() or "NOTA" in str(c).upper() or "AVISO" in str(c).upper()), None)
             col_e = next((c for c in df_bitacora.columns if "ESTADO" in str(c).upper()), None)
 
-            avisos_html = '<div style="display: flex; flex-direction: column; gap: 2px;">'
+            avisos_html = '<div style="display: flex; flex-direction: column; gap: 3px;">'
             avisos_cont = 0
             for _, row in df_bitacora.iterrows():
                 p_val = row[col_p] if col_p else "NORMAL"
