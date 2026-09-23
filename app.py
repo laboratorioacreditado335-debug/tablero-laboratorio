@@ -210,23 +210,24 @@ def calcular_progreso_orden(row):
     """
     Calcula el porcentaje exacto de avance (4 hitos de 25% cada uno):
     1. Registrada en el día = 25% (Base por existir)
-    2. Certificado Firmado = +25% (50%)
-    3. Enviado = +25% (75%)
-    4. CRM Salida = +25% (100% Completo)
+    2. Certificado Firmado = +25% (Solo si es 'SI' / 'SÍ', no cuenta 'P. firmar', 'P. revisar JA', etc.)
+    3. Enviado = +25% (Solo si tiene 'SI' / 'SÍ' o registro válido)
+    4. CRM Salida = +25% (Solo si tiene 'SI' / 'SÍ' o registro válido)
     """
     progreso = 25  # Hito 1: Registrada
 
-    cer = row.get("Cer firmado", row.get("CER FIRMADO", ""))
-    env = row.get("Enviado", row.get("ENVIADO", ""))
-    crm_sal = row.get("CRM salida", row.get("CRM SALIDA", ""))
+    cer = str(row.get("Cer firmado", row.get("CER FIRMADO", ""))).strip().upper()
+    env = str(row.get("Enviado", row.get("ENVIADO", ""))).strip().upper()
+    crm_sal = str(row.get("CRM salida", row.get("CRM SALIDA", ""))).strip().upper()
 
-    if tiene_valor_valido(cer):
+    # Solo sumar si el certificado está efectivamente firmado ('SI' / 'SÍ')
+    if cer in ["SI", "SÍ"]:
         progreso += 25
 
-    if tiene_valor_valido(env):
+    if env in ["SI", "SÍ"] or (tiene_valor_valido(env) and not env.startswith("P.")):
         progreso += 25
 
-    if tiene_valor_valido(crm_sal):
+    if crm_sal in ["SI", "SÍ"] or (tiene_valor_valido(crm_sal) and not crm_sal.startswith("P.")):
         progreso += 25
 
     return min(100, progreso)
@@ -293,6 +294,7 @@ def render_dark_table(df_page):
 
     headers = list(df_page.columns)
 
+    col_resp = next((c for c in headers if "RESPONSABLE" in c.upper()), None)
     col_cer = next(
         (c for c in headers if "CER" in c.upper() and "FIRM" in c.upper()), None
     )
@@ -337,11 +339,14 @@ def render_dark_table(df_page):
         for h in headers:
             val = limpiar_texto(row[h])
 
-            if h == col_orden and es_atascada:
+            if h == col_resp:
+                # La columna Responsables muestra el valor textual sin badges de estado
+                badge = val
+            elif h == col_orden and es_atascada:
                 badge = f'{val} <span style="background-color: rgba(245, 158, 11, 0.25); color: #FBBF24; border: 1px solid #F59E0B; padding: 1px 5px; border-radius: 4px; font-weight: 700; font-size: 10px;" title="Certificado firmado pero sin registro de CRM Salida">⚠️ Atascada</span>'
             elif val.upper() in ["SI", "SÍ"]:
                 badge = '<span style="background-color: rgba(16, 185, 129, 0.2); color: #A7F3D0; border: 1px solid #10B981; padding: 1px 6px; border-radius: 4px; font-weight: 700; font-size: 10.5px;">Si</span>'
-            elif "APROBAC" in val.upper() or "PENDIENTE" in val.upper():
+            elif "APROBAC" in val.upper() or "PENDIENTE" in val.upper() or val.upper().startswith("P.") or "FIRMAR" in val.upper() or "REVISAR" in val.upper():
                 badge = f'<span style="background-color: rgba(245, 158, 11, 0.2); color: #FDE68A; border: 1px solid #F59E0B; padding: 1px 6px; border-radius: 4px; font-weight: 600; font-size: 10.5px;">{val}</span>'
             elif "CORREC" in val.upper():
                 badge = f'<span style="background-color: rgba(239, 68, 68, 0.35); color: #FCA5A5; border: 1px solid #EF4444; padding: 1px 6px; border-radius: 4px; font-weight: 800; font-size: 10.5px;">{val} ⚠️</span>'
@@ -413,6 +418,7 @@ def render_tablero_fluido():
     cols_deseadas = [
         "Fecha",
         "# Orden",
+        "Responsables",
         "Cer firmado",
         "Enviado",
         "CRM salida",
@@ -442,6 +448,11 @@ def render_tablero_fluido():
                 and "# Orden" not in mapa_cols.values()
             ):
                 mapa_cols[col] = "# Orden"
+            elif (
+                "RESPONSABLE" in c_upper
+                and "Responsables" not in mapa_cols.values()
+            ):
+                mapa_cols[col] = "Responsables"
             elif (
                 "CER" in c_upper
                 and "FIRM" in c_upper
@@ -639,18 +650,13 @@ def render_tablero_fluido():
         df_pagina = df_vista.iloc[inicio:fin]
         cant_items_pagina = len(df_pagina)
 
-        # ---------------------------------------------------------------------
-        # REGLA DE TIEMPOS:
-        # Página 1 (p_idx == 0): 3 Minutos (180s)
-        # Páginas 2 en adelante: 60s para 10 ítems (proporcional si hay menos)
-        # ---------------------------------------------------------------------
+        # Duración base según la página
         if p_idx == 0:
             duracion_base = 180  # 3 minutos fijos para la página principal
         else:
-            # Proporcional según cantidad de filas (mínimo de resguardo 15s)
             duracion_base = max(15, int(60 * (cant_items_pagina / filas_por_pagina)))
 
-        # Sumamos el bonus de +30s si fue navegación manual
+        # Sumamos bonus manual si aplica
         duracion_total = duracion_base + st.session_state.get("manual_nav_bonus", 0)
 
         ahora = time.time()
@@ -659,7 +665,7 @@ def render_tablero_fluido():
         if tiempo_transcurrido >= duracion_total and total_paginas > 1:
             st.session_state.page_index = (st.session_state.page_index + 1) % total_paginas
             st.session_state.last_switch_time = ahora
-            st.session_state.manual_nav_bonus = 0  # Reiniciar bonus al pasar automáticamente
+            st.session_state.manual_nav_bonus = 0
             st.rerun()
 
         with col_info:
