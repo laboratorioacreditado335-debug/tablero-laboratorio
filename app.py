@@ -184,7 +184,7 @@ def parsear_fecha(val):
 
 
 def tiene_valor_valido(val):
-    """Verifica si una celda contiene un registro o dato de avance válido."""
+    """Verifica si una celda contiene un registro válido no vacío."""
     if pd.isna(val) or val is None:
         return False
     v = str(val).strip().upper()
@@ -194,10 +194,6 @@ def tiene_valor_valido(val):
         "NONE",
         "NULL",
         "NAT",
-        "PENDIENTE",
-        "NO",
-        "0",
-        "FALSE",
         "#ERROR!",
         "#N/A",
         "#VALOR!",
@@ -210,11 +206,11 @@ def calcular_progreso_orden(row):
     """
     Calcula el porcentaje exacto de avance (4 hitos de 25% cada uno):
     1. Registrada en el día = 25% (Base por existir)
-    2. Certificado Firmado = +25% (Solo si es 'SI' / 'SÍ')
-    3. Enviado = +25% (Solo si tiene 'SI' / 'SÍ' o registro válido)
-    4. CRM Salida = +25% (Solo si tiene 'SI' / 'SÍ' o registro válido)
+    2. Certificado Firmado = +25% (ESTRICTAMENTE 'SI' / 'SÍ')
+    3. Enviado = +25% (ESTRICTAMENTE 'SI' / 'SÍ')
+    4. CRM Salida = +25% (ESTRICTAMENTE 'SI' / 'SÍ')
     """
-    progreso = 25  # Hito 1: Registrada
+    progreso = 25  # Hito 1: Registrada (25%)
 
     cer = str(row.get("Cer firmado", row.get("CER FIRMADO", ""))).strip().upper()
     env = str(row.get("Enviado", row.get("ENVIADO", ""))).strip().upper()
@@ -223,10 +219,10 @@ def calcular_progreso_orden(row):
     if cer in ["SI", "SÍ"]:
         progreso += 25
 
-    if env in ["SI", "SÍ"] or (tiene_valor_valido(env) and not env.startswith("P.")):
+    if env in ["SI", "SÍ"]:
         progreso += 25
 
-    if crm_sal in ["SI", "SÍ"] or (tiene_valor_valido(crm_sal) and not crm_sal.startswith("P.")):
+    if crm_sal in ["SI", "SÍ"]:
         progreso += 25
 
     return min(100, progreso)
@@ -297,6 +293,7 @@ def render_dark_table(df_page):
     col_cer = next(
         (c for c in headers if "CER" in c.upper() and "FIRM" in c.upper()), None
     )
+    col_env = next((c for c in headers if "ENV" in c.upper()), None)
     col_crm_salida = next(
         (c for c in headers if "CRM" in c.upper() and "SALIDA" in c.upper()), None
     )
@@ -305,7 +302,11 @@ def render_dark_table(df_page):
     html = '<div style="overflow-x: auto; border: 1px solid #1F2937; border-radius: 6px; background-color: #111827; margin-bottom: 4px;"><table style="width: 100%; border-collapse: collapse; color: #F3F4F6; font-size: 12.5px; text-align: left;"><thead><tr style="background-color: #1F2937; color: #9CA3AF; font-weight: 700; text-transform: uppercase; font-size: 11px; letter-spacing: 0.5px;">'
 
     for h in headers:
-        html += f'<th style="padding: 5px 8px; border-bottom: 1px solid #374151;">{h}</th>'
+        if h == col_resp:
+            # Columna de Responsables ajustada a un ancho menor
+            html += f'<th style="padding: 5px 4px; border-bottom: 1px solid #374151; width: 75px; text-align: center; white-space: nowrap;">{h}</th>'
+        else:
+            html += f'<th style="padding: 5px 8px; border-bottom: 1px solid #374151;">{h}</th>'
     html += "</tr></thead><tbody>"
 
     for idx, row in df_page.iterrows():
@@ -315,14 +316,14 @@ def render_dark_table(df_page):
             else ""
         )
         crm_sal_val = (
-            str(row[col_crm_salida]).strip()
+            str(row[col_crm_salida]).strip().upper()
             if col_crm_salida and pd.notna(row[col_crm_salida])
             else ""
         )
 
         es_correccion = "CORREC" in cer_val
         cer_es_si = cer_val in ["SI", "SÍ"]
-        crm_vacio = not tiene_valor_valido(crm_sal_val)
+        crm_vacio = crm_sal_val not in ["SI", "SÍ"]
         es_atascada = cer_es_si and crm_vacio
 
         if es_correccion:
@@ -337,21 +338,41 @@ def render_dark_table(df_page):
         html += f"<tr {tr_style}>"
         for h in headers:
             val = limpiar_texto(row[h])
+            val_upper = val.upper()
+
+            td_style = "padding: 4px 8px;"
 
             if h == col_resp:
-                badge = val
+                td_style = "padding: 4px 4px; text-align: center; width: 75px; white-space: nowrap;"
+                badge = f'<span style="color: #38BDF8; font-weight: 700; font-size: 11.5px;">{val}</span>'
             elif h == col_orden and es_atascada:
                 badge = f'{val} <span style="background-color: rgba(245, 158, 11, 0.25); color: #FBBF24; border: 1px solid #F59E0B; padding: 1px 5px; border-radius: 4px; font-weight: 700; font-size: 10px;" title="Certificado firmado pero sin registro de CRM Salida">⚠️ Atascada</span>'
-            elif val.upper() in ["SI", "SÍ"]:
+            elif val_upper in ["SI", "SÍ"]:
                 badge = '<span style="background-color: rgba(16, 185, 129, 0.2); color: #A7F3D0; border: 1px solid #10B981; padding: 1px 6px; border-radius: 4px; font-weight: 700; font-size: 10.5px;">Si</span>'
-            elif "APROBAC" in val.upper() or "PENDIENTE" in val.upper() or val.upper().startswith("P.") or "FIRMAR" in val.upper() or "REVISAR" in val.upper():
-                badge = f'<span style="background-color: rgba(245, 158, 11, 0.2); color: #FDE68A; border: 1px solid #F59E0B; padding: 1px 6px; border-radius: 4px; font-weight: 600; font-size: 10.5px;">{val}</span>'
-            elif "CORREC" in val.upper():
-                badge = f'<span style="background-color: rgba(239, 68, 68, 0.35); color: #FCA5A5; border: 1px solid #EF4444; padding: 1px 6px; border-radius: 4px; font-weight: 800; font-size: 10.5px;">{val} ⚠️</span>'
+            elif val != "":
+                # Manejo dinámico de textos diferentes a "SI" en Envíos, CRM Salida o Estados
+                if (
+                    "CORREC" in val_upper
+                    or "ERROR" in val_upper
+                    or "RECHAZ" in val_upper
+                    or "CANCEL" in val_upper
+                ):
+                    badge = f'<span style="background-color: rgba(239, 68, 68, 0.25); color: #FCA5A5; border: 1px solid #EF4444; padding: 1px 6px; border-radius: 4px; font-weight: 700; font-size: 10.5px;">{val} ⚠️</span>'
+                elif (
+                    h in [col_env, col_crm_salida, col_cer]
+                    or "APROBAC" in val_upper
+                    or "PENDIENTE" in val_upper
+                    or val_upper.startswith("P.")
+                    or "FIRMAR" in val_upper
+                    or "REVISAR" in val_upper
+                ):
+                    badge = f'<span style="background-color: rgba(245, 158, 11, 0.2); color: #FDE68A; border: 1px solid #F59E0B; padding: 1px 6px; border-radius: 4px; font-weight: 600; font-size: 10.5px;">{val}</span>'
+                else:
+                    badge = val
             else:
-                badge = val
+                badge = ""
 
-            html += f'<td style="padding: 4px 8px;">{badge}</td>'
+            html += f'<td style="{td_style}">{badge}</td>'
         html += "</tr>"
 
     html += "</tbody></table></div>"
@@ -458,7 +479,7 @@ def render_tablero_fluido():
             elif ("CRM" in c_upper and "CERT" in c_upper) and "CRM cert." not in mapa_cols.values():
                 mapa_cols[col] = "CRM cert."
 
-        # Fallback por posición: si "Responsables" aún no fue mapeado y la tabla tiene >= 3 columnas
+        # Fallback por posición si Responsables no ha sido mapeado
         if "Responsables" not in mapa_cols.values() and len(cols_raw) >= 3:
             col_pos2 = cols_raw[2]
             if col_pos2 not in mapa_cols:
