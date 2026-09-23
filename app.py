@@ -249,10 +249,10 @@ def render_dark_table(df_page):
     )
     col_orden = next((c for c in headers if "ORDEN" in c.upper()), None)
 
-    html = '<div style="overflow-x: auto; border: 1px solid #1F2937; border-radius: 8px; background-color: #111827; margin-bottom: 6px;"><table style="width: 100%; border-collapse: collapse; color: #F3F4F6; font-size: 13px; text-align: left;"><thead><tr style="background-color: #1F2937; color: #9CA3AF; font-weight: 700; text-transform: uppercase; font-size: 11px; letter-spacing: 0.5px;">'
+    html = '<div style="overflow-x: auto; border: 1px solid #1F2937; border-radius: 8px; background-color: #111827; margin-bottom: 6px;"><table style="width: 100%; border-collapse: collapse; color: #F3F4F6; font-size: 12.5px; text-align: left;"><thead><tr style="background-color: #1F2937; color: #9CA3AF; font-weight: 700; text-transform: uppercase; font-size: 10.5px; letter-spacing: 0.5px;">'
 
     for h in headers:
-        html += f'<th style="padding: 8px 12px; border-bottom: 1px solid #374151;">{h}</th>'
+        html += f'<th style="padding: 6px 10px; border-bottom: 1px solid #374151;">{h}</th>'
     html += "</tr></thead><tbody>"
 
     for idx, row in df_page.iterrows():
@@ -294,17 +294,17 @@ def render_dark_table(df_page):
             val = limpiar_texto(row[h])
 
             if h == col_orden and es_atascada:
-                badge = f'{val} <span style="background-color: rgba(245, 158, 11, 0.25); color: #FBBF24; border: 1px solid #F59E0B; padding: 1px 6px; border-radius: 8px; font-weight: 700; font-size: 10px; margin-left: 4px;" title="Certificado firmado pero sin registro de CRM Salida">⚠️ Atascada</span>'
+                badge = f'{val} <span style="background-color: rgba(245, 158, 11, 0.25); color: #FBBF24; border: 1px solid #F59E0B; padding: 1px 5px; border-radius: 6px; font-weight: 700; font-size: 9.5px; margin-left: 4px;" title="Certificado firmado pero sin registro de CRM Salida">⚠️ Atascada</span>'
             elif val.upper() in ["SI", "SÍ"]:
-                badge = '<span style="background-color: rgba(16, 185, 129, 0.2); color: #A7F3D0; border: 1px solid #10B981; padding: 1px 7px; border-radius: 10px; font-weight: 700; font-size: 10.5px;">Si</span>'
+                badge = '<span style="background-color: rgba(16, 185, 129, 0.2); color: #A7F3D0; border: 1px solid #10B981; padding: 1px 6px; border-radius: 8px; font-weight: 700; font-size: 10px;">Si</span>'
             elif "APROBAC" in val.upper() or "PENDIENTE" in val.upper():
-                badge = f'<span style="background-color: rgba(245, 158, 11, 0.2); color: #FDE68A; border: 1px solid #F59E0B; padding: 1px 7px; border-radius: 10px; font-weight: 600; font-size: 10.5px;">{val}</span>'
+                badge = f'<span style="background-color: rgba(245, 158, 11, 0.2); color: #FDE68A; border: 1px solid #F59E0B; padding: 1px 6px; border-radius: 8px; font-weight: 600; font-size: 10px;">{val}</span>'
             elif "CORREC" in val.upper():
-                badge = f'<span style="background-color: rgba(239, 68, 68, 0.35); color: #FCA5A5; border: 1px solid #EF4444; padding: 1px 7px; border-radius: 10px; font-weight: 800; font-size: 10.5px;">{val} ⚠️</span>'
+                badge = f'<span style="background-color: rgba(239, 68, 68, 0.35); color: #FCA5A5; border: 1px solid #EF4444; padding: 1px 6px; border-radius: 8px; font-weight: 800; font-size: 10px;">{val} ⚠️</span>'
             else:
                 badge = val
 
-            html += f'<td style="padding: 6px 12px;">{badge}</td>'
+            html += f'<td style="padding: 5px 10px;">{badge}</td>'
         html += "</tr>"
 
     html += "</tbody></table></div>"
@@ -573,7 +573,7 @@ def render_tablero_fluido():
 
     st.markdown("<div style='margin-bottom: 6px;'></div>", unsafe_allow_html=True)
 
-    # 2. TABLA PRINCIPAL CON NAVEGACIÓN Y BUSCADOR INTEGRADOC
+    # 2. TABLA PRINCIPAL CON NAVEGACIÓN Y BUSCADOR INTEGRADO
     if df_vista is not None and not df_vista.empty:
         col_btn1, col_btn2, col_search, col_info = st.columns([1.1, 1.1, 1.8, 2.5])
 
@@ -607,13 +607,17 @@ def render_tablero_fluido():
                 df_vista[col_target].astype(str).str.lower().str.contains(term, na=False)
             ]
 
-        filas_por_pagina = 8
+        # MODIFICACIÓN A 10 ÓRDENES POR PÁGINA
+        filas_por_pagina = 10
         total_filas = len(df_vista)
         total_paginas = max(1, (total_filas + filas_por_pagina - 1) // filas_por_pagina)
 
         ahora = time.time()
 
-        if (ahora - st.session_state.last_switch_time) >= 90 and total_paginas > 1:
+        # PÁGINA 1 DURA 180s (3 MIN), LAS DEMÁS PÁGINAS DURAN 90s
+        tiempo_permanencia = 180 if st.session_state.page_index == 0 else 90
+
+        if (ahora - st.session_state.last_switch_time) >= tiempo_permanencia and total_paginas > 1:
             st.session_state.page_index = (st.session_state.page_index + 1) % total_paginas
             st.session_state.last_switch_time = ahora
 
@@ -621,7 +625,7 @@ def render_tablero_fluido():
             st.session_state.page_index = 0
 
         with col_info:
-            segundos_restantes = max(0, int(90 - (ahora - st.session_state.last_switch_time)))
+            segundos_restantes = max(0, int(tiempo_permanencia - (ahora - st.session_state.last_switch_time)))
             st.caption(
                 f"Pág. {st.session_state.page_index + 1}/{total_paginas} ({total_filas} registros)"
                 f" | ⏱️ Auto-cambio en {segundos_restantes}s"
@@ -638,7 +642,7 @@ def render_tablero_fluido():
         st.error(f"⚠️ {info_estado}")
 
     st.markdown(
-        "<hr style='border-color: #1F2937; margin: 10px 0;'>",
+        "<hr style='border-color: #1F2937; margin: 8px 0;'>",
         unsafe_allow_html=True,
     )
 
@@ -646,13 +650,13 @@ def render_tablero_fluido():
     c_left, c_middle, c_right = st.columns([1, 1, 1.2])
 
     with c_left:
-        st.markdown("<h4 style='margin:0 0 2px 0; font-size:15px; color:#F3F4F6;'>🚚 Programadas p/ Hoy</h4>", unsafe_allow_html=True)
+        st.markdown("<h4 style='margin:0 0 2px 0; font-size:14px; color:#F3F4F6;'>🚚 Programadas p/ Hoy</h4>", unsafe_allow_html=True)
         st.caption(
             f"🗓️ Fecha: **{fecha_activa_str}** | {total_hoy} agendadas"
         )
         if ordenes_hoy:
             html_list = (
-                '<div style="max-height: 180px; overflow-y: auto; padding-right: 4px;">'
+                '<div style="max-height: 160px; overflow-y: auto; padding-right: 4px;">'
             )
             for ord_num in ordenes_hoy:
                 html_list += f'<div class="order-card">📦 Orden #: {ord_num}</div>'
@@ -662,10 +666,10 @@ def render_tablero_fluido():
             st.info(f"Sin órdenes hoy ({fecha_activa_str}).")
 
     with c_middle:
-        st.markdown("<h4 style='margin:0 0 2px 0; font-size:15px; color:#F3F4F6;'>🎯 Meta del Día</h4>", unsafe_allow_html=True)
+        st.markdown("<h4 style='margin:0 0 2px 0; font-size:14px; color:#F3F4F6;'>🎯 Meta del Día</h4>", unsafe_allow_html=True)
         st.markdown(
             f"""
-            <div style="background-color: #111827; border: 1px solid #1F2937; border-radius: 6px; padding: 10px 14px; margin-top: 18px; display: flex; justify-content: space-between; align-items: center;">
+            <div style="background-color: #111827; border: 1px solid #1F2937; border-radius: 6px; padding: 10px 14px; margin-top: 14px; display: flex; justify-content: space-between; align-items: center;">
                 <span style="font-size: 11px; font-weight: 700; color: #9CA3AF; letter-spacing: 0.5px;">DESPACHOS CUMPLIDOS</span>
                 <span style="font-size: 15px; font-weight: 800; color: #60A5FA;">{cumplidos_hoy} de {total_hoy} ({porcentaje_hoy}%)</span>
             </div>
@@ -674,7 +678,7 @@ def render_tablero_fluido():
         )
 
     with c_right:
-        st.markdown("<h4 style='margin:0 0 2px 0; font-size:15px; color:#F3F4F6;'>📌 Bitácora / Avisos del Día</h4>", unsafe_allow_html=True)
+        st.markdown("<h4 style='margin:0 0 2px 0; font-size:14px; color:#F3F4F6;'>📌 Bitácora / Avisos del Día</h4>", unsafe_allow_html=True)
         if df_bitacora is None or df_bitacora.empty:
             st.info(
                 "Sin avisos en 'NOTAS DEL DIA'."
@@ -703,7 +707,7 @@ def render_tablero_fluido():
             )
 
             avisos_html = (
-                '<div style="max-height: 180px; overflow-y: auto; padding-right: 4px;">'
+                '<div style="max-height: 160px; overflow-y: auto; padding-right: 4px;">'
             )
             avisos_cont = 0
             for _, row in df_bitacora.iterrows():
