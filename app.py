@@ -195,9 +195,14 @@ def cargar_datos_gsheets():
       if col_fecha:
         if col_fecha != "Fecha":
           df_proceso.rename(columns={col_fecha: "Fecha"}, inplace=True)
+
+        # 1. Normalizar vacíos a NaN
         df_proceso["Fecha"] = df_proceso["Fecha"].replace(
-            ["", "nan", "none", "null", "nat", "NaN"], np.nan
+            ["", "nan", "none", "null", "nat", "NaN", "None"], np.nan
         )
+
+        # 2. Arrastrar la fecha hacia abajo (Forward Fill) para celdas combinadas de Excel
+        df_proceso["Fecha"] = df_proceso["Fecha"].ffill()
 
     df_notas = pd.DataFrame()
     if df_notas_raw is not None and not df_notas_raw.empty:
@@ -440,6 +445,7 @@ def render_tablero_fluido():
 
     df_vista[col_ord_main] = df_vista[col_ord_main].apply(limpiar_numero)
 
+    # Filtrar solo filas con número de orden válido
     df_vista = df_vista[
         df_vista[col_ord_main].notna()
         & (df_vista[col_ord_main].astype(str).str.strip() != "")
@@ -453,9 +459,10 @@ def render_tablero_fluido():
     ].copy()
 
     if "Fecha" in df_vista.columns:
+      # Parsear la fecha ya rellenada
       df_vista["Fecha_dt"] = df_vista["Fecha"].apply(parsear_fecha)
 
-      # Conteo Global
+      # Conteo de KPIs Globales
       total_reg = len(df_vista)
       if "Cer firmado" in df_vista.columns:
         total_firm = (
@@ -477,7 +484,7 @@ def render_tablero_fluido():
         )
       total_pend = max(0, total_reg - total_env)
 
-      # 🎯 OBTENER DINÁMICAMENTE LAS ÓRDENAS DE HOY DESDE LA TABLA PRINCIPAL
+      # 🎯 OBTENER ÓRDENES DE HOY DESDE LA TABLA DEL EXCEL
       df_hoy = df_vista[df_vista["Fecha_dt"] == hoy_dt]
 
       if not df_hoy.empty:
@@ -499,11 +506,12 @@ def render_tablero_fluido():
             int((cumplidos_hoy / total_hoy) * 100) if total_hoy > 0 else 0
         )
 
-      # Ordenar para mostrar siempre la fecha más reciente (hoy) primero
+      # Ordenar descendente para que hoy aparezca al inicio
       df_vista = df_vista.sort_values(
           by=["Fecha_dt", col_ord_main], ascending=[False, True]
       ).reset_index(drop=True)
 
+      # Formatear la columna de fecha visible para que aparezca en CADA fila
       df_vista["Fecha"] = df_vista["Fecha_dt"].apply(
           lambda d: d.strftime("%d/%m/%Y")
           if pd.notna(d) and d is not None
