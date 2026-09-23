@@ -1,6 +1,9 @@
-from datetime import datetime
+import re
 import time
 import urllib.parse
+import urllib.request
+from datetime import datetime
+from bs4 import BeautifulSoup
 import numpy as np
 import pandas as pd
 import streamlit as st
@@ -122,7 +125,7 @@ if "manual_nav_bonus" not in st.session_state:
 
 
 # ---------------------------------------------------------
-# FUNCIONES AUXILIARES Y PARSER DE DATOS
+# FUNCIONES AUXILIARES Y PARSER DE DATOS Y COLORES
 # ---------------------------------------------------------
 def limpiar_texto(val):
     if pd.isna(val) or val is None:
@@ -133,11 +136,34 @@ def limpiar_texto(val):
     return val_str
 
 
+def es_color_valido_custom(val):
+    """Verifica si un valor hexadecimal/rgb de celda es un color personalizado distinto de blanco o transparente."""
+    if not val or pd.isna(val):
+        return False
+    v = str(val).strip().lower()
+    if v in [
+        "",
+        "none",
+        "nan",
+        "#ffffff",
+        "#fff",
+        "rgb(255, 255, 255)",
+        "rgb(255,255,255)",
+        "transparent",
+        "rgba(0, 0, 0, 0)",
+        "rgba(0,0,0,0)",
+        "rgba(255,255,255,1)",
+        "#00000000",
+    ]:
+        return False
+    return True
+
+
 def leer_hoja_google(nombre_hoja, header_none=False):
     """
     Lee una pestaña de Google Sheets en formato CSV.
     Se incluye `keep_default_na=False` para evitar que las iniciales 'NA'
-    (Nicolás Arévalo) sean convertidas automáticamente a valores nulos (NaN).
+    sean convertidas automáticamente a valores nulos (NaN).
     """
     nombre_enc = urllib.parse.quote(nombre_hoja)
     nocache = int(time.time())
@@ -145,6 +171,127 @@ def leer_hoja_google(nombre_hoja, header_none=False):
     if header_none:
         return pd.read_csv(url, header=None, keep_default_na=False)
     return pd.read_csv(url, keep_default_na=False)
+
+
+def leer_hoja_google_con_colores(nombre_hoja):
+    """
+    Lee una pestaña de Google Sheets exportando el HTML renderizado para extraer 
+    tanto el contenido textual como los colores de fondo asignados en el Excel/Sheet.
+    """
+    nombre_enc = urllib.parse.quote(nombre_hoja)
+    nocache = int(time.time())
+    url = f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_ID}/export?format=html&sheet={nombre_enc}&_cb={nocache}"
+
+    try:
+        req = urllib.request.Request(
+            url, headers={"User-Agent": "Mozilla/5.0"}
+        )
+        html_bytes = urllib.request.urlopen(req, timeout=10).read()
+        html_str = html_bytes.decode("utf-8", errors="ignore")
+
+        soup = BeautifulSoup(html_str, "html.parser")
+
+        # Extraer mapa de estilos CSS asignados a las clases de Google Sheets
+        color_map = {}
+        for style in soup.find_all("style"):
+            css = style.string if style.string else ""
+            matches = re.findall(
+                r"\.([a-zA-Z0-9_-]+)\s*\{[^}]*background-color:\s*([^;\}]+)",
+                css,
+            )
+            for cls, bg in matches:
+                color_map[cls] = bg.strip()
+
+        table = soup.find("table")
+        if not table:
+            return None, []
+
+        rows_data = []
+        rows_colors = []
+
+        for tr in table.find_all("tr"):
+            cells = tr.find_all(["td", "th"])
+            if not cells:
+                continue
+            row_vals = []
+            row_cols = []
+            for td in cells:
+                val = td.get_text(strip=True)
+                row_vals.append(val)
+
+                bg = None
+                style_attr = td.get("style", "")
+                m = re.search(r"background-color:\s*([^;\}]+)", style_attr)
+                if m:
+                    bg = m.group(1).strip()
+                else:
+                    classes = td.get("class", [])
+                    if isinstance(classes, str):
+                        classes = classes.split()
+                    for c in classes:
+                        if c in color_map:
+                            bg = color_map[c]
+                            break
+                row_cols.append(bg)
+
+            if any(v != "" for v in row_vals):
+                rows_data.append(row_vals)
+                rows_colors.append(row_cols)
+
+        if not rows_data:
+            return None, []
+
+        df_raw = pd.DataFrame(rows_data)
+        return df_raw, rows_colors
+    except Exception:
+        return None, []
+
+
+def leer_excel_con_colores(file_or_path, nombre_hoja="NOTAS DEL DIA"):
+    """
+    Función de compatibilidad futura: Lee un archivo Excel local/subido (.xlsx) 
+    y extrae datos junto a los colores de fondo de celda usando openpyxl.
+    """
+    try:
+        import openpyxl
+
+        wb = openpyxl.load_workbook(file_or_path, data_only=True)
+        if nombre_hoja in wb.sheetnames:
+            sheet = wb[nombre_hoja]
+        else:
+            sheet = wb.active
+
+        rows_data = []
+        rows_colors = []
+
+        for row in sheet.iter_rows():
+            r_vals = []
+            r_cols = []
+            for cell in row:
+                val = cell.value if cell.value is not None else ""
+                r_vals.append(str(val))
+
+                color_hex = None
+                if cell.fill and cell.fill.start_color:
+                    sc = cell.fill.start_color
+                    if sc.rgb and isinstance(sc.rgb, str):
+                        rgb_str = sc.rgb
+                        if len(rgb_str) == 8:
+                            color_hex = f"#{rgb_str[2:]}"
+                        elif len(rgb_str) == 6:
+                            color_hex = f"#{rgb_str}"
+                r_cols.append(color_hex)
+
+            if any(v != "" for v in r_vals):
+                rows_data.append(r_vals)
+                rows_colors.append(r_cols)
+
+        if not rows_data:
+            return None, []
+
+        return pd.DataFrame(rows_data), rows_colors
+    except Exception:
+        return None, []
 
 
 def parsear_fecha(val):
@@ -236,7 +383,12 @@ def calcular_progreso_orden(row):
 def cargar_datos_gsheets():
     try:
         df_proceso_raw = leer_hoja_google("C. Proceso órdenes", header_none=True)
-        df_notas_raw = leer_hoja_google("NOTAS DEL DIA")
+
+        # Intentar obtener datos y colores de NOTAS DEL DIA en HTML
+        df_notas_raw, list_colors_raw = leer_hoja_google_con_colores("NOTAS DEL DIA")
+        if df_notas_raw is None or df_notas_raw.empty:
+            df_notas_raw = leer_hoja_google("NOTAS DEL DIA")
+            list_colors_raw = []
 
         df_proceso = pd.DataFrame()
 
@@ -260,6 +412,8 @@ def cargar_datos_gsheets():
                 ]
 
         df_notas = pd.DataFrame()
+        notas_colors = []
+
         if df_notas_raw is not None and not df_notas_raw.empty:
             header_n_idx = None
             for idx, row in df_notas_raw.iterrows():
@@ -276,11 +430,33 @@ def cargar_datos_gsheets():
             if header_n_idx is not None:
                 df_notas = df_notas_raw.iloc[header_n_idx + 1 :].copy()
                 df_notas.columns = df_notas_raw.iloc[header_n_idx].values
+                if list_colors_raw and len(list_colors_raw) > header_n_idx + 1:
+                    notas_colors = list_colors_raw[header_n_idx + 1 :]
             else:
-                df_notas = df_notas_raw.copy()
+                df_notas = df_notas_raw.iloc[1:].copy()
+                df_notas.columns = df_notas_raw.iloc[0].values
+                if list_colors_raw and len(list_colors_raw) > 1:
+                    notas_colors = list_colors_raw[1:]
 
             df_notas.columns = [str(col).strip() for col in df_notas.columns]
-            df_notas = df_notas.replace("", np.nan).dropna(how="all")
+
+            valid_indices = []
+            color_excel_list = []
+
+            for i, (idx_row, row) in enumerate(df_notas.iterrows()):
+                row_check = row.replace("", np.nan).dropna(how="all")
+                if not row_check.empty:
+                    valid_indices.append(i)
+                    row_c = None
+                    if i < len(notas_colors):
+                        for cell_color in notas_colors[i]:
+                            if es_color_valido_custom(cell_color):
+                                row_c = cell_color
+                                break
+                    color_excel_list.append(row_c)
+
+            df_notas = df_notas.iloc[valid_indices].copy().reset_index(drop=True)
+            df_notas["_COLOR_EXCEL"] = color_excel_list
 
         return df_proceso, df_notas, "Conectado correctamente"
 
@@ -384,7 +560,7 @@ def render_dark_table(df_page):
     return html
 
 
-def render_bitacora_card(prioridad_val, descripcion_val, estado_val):
+def render_bitacora_card(prioridad_val, descripcion_val, estado_val, color_excel=None):
     prioridad = (
         str(prioridad_val if pd.notna(prioridad_val) else "NORMAL")
         .strip()
@@ -405,31 +581,42 @@ def render_bitacora_card(prioridad_val, descripcion_val, estado_val):
         "NORMAL": "#6B7280",
         "MANTENIMIENTO": "#10B981",
     }
-    border_color = priority_colors.get(prioridad, "#3B82F6")
 
+    # Asignar con prioridad el color detectado desde la hoja de Excel / Google Sheet
+    if es_color_valido_custom(color_excel):
+        border_color = str(color_excel).strip()
+    else:
+        border_color = priority_colors.get(prioridad, "#EF4444")
+
+    # Estilos de etiquetas según el estado (soporte completo para PENDIENTE, REALIZADO, COMPLETADO, EN PROCESO)
     status_styles = {
         "PENDIENTE": {
-            "bg": "rgba(239, 68, 68, 0.2)",
+            "bg": "rgba(239, 68, 68, 0.15)",
             "text": "#FCA5A5",
             "border": "#EF4444",
         },
-        "EN PROCESO": {
-            "bg": "rgba(245, 158, 11, 0.2)",
-            "text": "#FDE68A",
-            "border": "#F59E0B",
+        "REALIZADO": {
+            "bg": "rgba(255, 255, 255, 0.05)",
+            "text": "#E5E7EB",
+            "border": "#9CA3AF",
         },
         "COMPLETADO": {
-            "bg": "rgba(16, 185, 129, 0.2)",
+            "bg": "rgba(16, 185, 129, 0.15)",
             "text": "#A7F3D0",
             "border": "#10B981",
+        },
+        "EN PROCESO": {
+            "bg": "rgba(245, 158, 11, 0.15)",
+            "text": "#FDE68A",
+            "border": "#F59E0B",
         },
     }
     s_style = status_styles.get(
         estado,
-        {"bg": "rgba(107, 114, 128, 0.2)", "text": "#E5E7EB", "border": "#9CA3AF"},
+        {"bg": "rgba(156, 163, 175, 0.15)", "text": "#E5E7EB", "border": "#9CA3AF"},
     )
 
-    return f'<div style="background: #111827; border-left: 3px solid {border_color}; border-radius: 5px; padding: 5px 8px; margin-bottom: 3px; display: flex; justify-content: space-between; align-items: center; gap: 8px;"><div style="color: #F3F4F6; font-size: 12px; font-weight: 500; line-height: 1.2; flex-grow: 1;">{descripcion}</div><div style="background-color: {s_style["bg"]}; color: {s_style["text"]}; border: 1px solid {s_style["border"]}; font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 6px; white-space: nowrap;">{estado}</div></div>'
+    return f'<div style="background: #111827; border-left: 3px solid {border_color}; border-radius: 5px; padding: 6px 10px; margin-bottom: 4px; display: flex; justify-content: space-between; align-items: center; gap: 10px;"><div style="color: #F3F4F6; font-size: 12.5px; font-weight: 500; line-height: 1.3; flex-grow: 1;">{descripcion}</div><div style="background-color: {s_style["bg"]}; color: {s_style["text"]}; border: 1px solid {s_style["border"]}; font-size: 10.5px; font-weight: 700; padding: 3px 8px; border-radius: 5px; white-space: nowrap; letter-spacing: 0.3px;">{estado}</div></div>'
 
 
 # ---------------------------------------------------------
@@ -768,6 +955,7 @@ def render_tablero_fluido():
             col_p = next((c for c in df_bitacora.columns if "TIPO" in str(c).upper() or "PRIORIDAD" in str(c).upper()), None)
             col_d = next((c for c in df_bitacora.columns if "DESCRIP" in str(c).upper() or "NOTA" in str(c).upper() or "AVISO" in str(c).upper()), None)
             col_e = next((c for c in df_bitacora.columns if "ESTADO" in str(c).upper()), None)
+            col_c = next((c for c in df_bitacora.columns if "_COLOR_EXCEL" in str(c).upper()), None)
 
             avisos_html = '<div style="display: flex; flex-direction: column; gap: 3px;">'
             avisos_cont = 0
@@ -775,13 +963,14 @@ def render_tablero_fluido():
                 p_val = row[col_p] if col_p else "NORMAL"
                 d_val = row[col_d] if col_d else ""
                 e_val = row[col_e] if col_e else "PENDIENTE"
+                c_val = row[col_c] if col_c and pd.notna(row[col_c]) else None
 
                 if (
                     pd.notna(d_val)
                     and str(d_val).strip() != ""
                     and str(d_val).strip().lower() != "nan"
                 ):
-                    avisos_html += render_bitacora_card(p_val, d_val, e_val)
+                    avisos_html += render_bitacora_card(p_val, d_val, e_val, color_excel=c_val)
                     avisos_cont += 1
             avisos_html += "</div>"
 
