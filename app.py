@@ -100,7 +100,7 @@ if "last_switch_time" not in st.session_state:
 
 
 # ---------------------------------------------------------
-# FUNCIONES AUXILIARES Y LECTURA INSTANTÁNEA
+# FUNCIONES AUXILIARES Y LECTURA
 # ---------------------------------------------------------
 def limpiar_numero(val):
   if pd.isna(val) or val is None:
@@ -196,12 +196,10 @@ def cargar_datos_gsheets():
         if col_fecha != "Fecha":
           df_proceso.rename(columns={col_fecha: "Fecha"}, inplace=True)
 
-        # 1. Normalizar vacíos a NaN
+        # RELLENO HACIA ABAJO (FFILL) PARA DESCOMBINAR CELDAS DE EXCEL
         df_proceso["Fecha"] = df_proceso["Fecha"].replace(
             ["", "nan", "none", "null", "nat", "NaN", "None"], np.nan
         )
-
-        # 2. Arrastrar la fecha hacia abajo (Forward Fill) para celdas combinadas de Excel
         df_proceso["Fecha"] = df_proceso["Fecha"].ffill()
 
     df_notas = pd.DataFrame()
@@ -445,7 +443,6 @@ def render_tablero_fluido():
 
     df_vista[col_ord_main] = df_vista[col_ord_main].apply(limpiar_numero)
 
-    # Filtrar solo filas con número de orden válido
     df_vista = df_vista[
         df_vista[col_ord_main].notna()
         & (df_vista[col_ord_main].astype(str).str.strip() != "")
@@ -459,10 +456,14 @@ def render_tablero_fluido():
     ].copy()
 
     if "Fecha" in df_vista.columns:
-      # Parsear la fecha ya rellenada
+      # RELLENO SECUNDARIO DE FECHA POR SEGURIDAD
+      df_vista["Fecha"] = df_vista["Fecha"].replace(
+          ["", "nan", "none", "null", "nat", "NaN", "None"], np.nan
+      )
+      df_vista["Fecha"] = df_vista["Fecha"].ffill()
       df_vista["Fecha_dt"] = df_vista["Fecha"].apply(parsear_fecha)
 
-      # Conteo de KPIs Globales
+      # Conteo Global
       total_reg = len(df_vista)
       if "Cer firmado" in df_vista.columns:
         total_firm = (
@@ -484,7 +485,7 @@ def render_tablero_fluido():
         )
       total_pend = max(0, total_reg - total_env)
 
-      # 🎯 OBTENER ÓRDENES DE HOY DESDE LA TABLA DEL EXCEL
+      # 🎯 OBTENER ÓRDENES CORRESPONDIENTES A HOY
       df_hoy = df_vista[df_vista["Fecha_dt"] == hoy_dt]
 
       if not df_hoy.empty:
@@ -506,12 +507,12 @@ def render_tablero_fluido():
             int((cumplidos_hoy / total_hoy) * 100) if total_hoy > 0 else 0
         )
 
-      # Ordenar descendente para que hoy aparezca al inicio
+      # Ordenar por fecha más reciente (hoy primero)
       df_vista = df_vista.sort_values(
           by=["Fecha_dt", col_ord_main], ascending=[False, True]
       ).reset_index(drop=True)
 
-      # Formatear la columna de fecha visible para que aparezca en CADA fila
+      # ASIGNAR LA FECHA FORMATEADA A CADA FILA SIN DEJAR CELDAS VACÍAS
       df_vista["Fecha"] = df_vista["Fecha_dt"].apply(
           lambda d: d.strftime("%d/%m/%Y")
           if pd.notna(d) and d is not None
