@@ -210,7 +210,7 @@ def calcular_progreso_orden(row):
     """
     Calcula el porcentaje exacto de avance (4 hitos de 25% cada uno):
     1. Registrada en el día = 25% (Base por existir)
-    2. Certificado Firmado = +25% (Solo si es 'SI' / 'SÍ', no cuenta 'P. firmar', 'P. revisar JA', etc.)
+    2. Certificado Firmado = +25% (Solo si es 'SI' / 'SÍ')
     3. Enviado = +25% (Solo si tiene 'SI' / 'SÍ' o registro válido)
     4. CRM Salida = +25% (Solo si tiene 'SI' / 'SÍ' o registro válido)
     """
@@ -220,7 +220,6 @@ def calcular_progreso_orden(row):
     env = str(row.get("Enviado", row.get("ENVIADO", ""))).strip().upper()
     crm_sal = str(row.get("CRM salida", row.get("CRM SALIDA", ""))).strip().upper()
 
-    # Solo sumar si el certificado está efectivamente firmado ('SI' / 'SÍ')
     if cer in ["SI", "SÍ"]:
         progreso += 25
 
@@ -294,7 +293,7 @@ def render_dark_table(df_page):
 
     headers = list(df_page.columns)
 
-    col_resp = next((c for c in headers if "RESPONSABLE" in c.upper()), None)
+    col_resp = next((c for c in headers if "RESP" in c.upper()), None)
     col_cer = next(
         (c for c in headers if "CER" in c.upper() and "FIRM" in c.upper()), None
     )
@@ -340,7 +339,6 @@ def render_dark_table(df_page):
             val = limpiar_texto(row[h])
 
             if h == col_resp:
-                # La columna Responsables muestra el valor textual sin badges de estado
                 badge = val
             elif h == col_orden and es_atascada:
                 badge = f'{val} <span style="background-color: rgba(245, 158, 11, 0.25); color: #FBBF24; border: 1px solid #F59E0B; padding: 1px 5px; border-radius: 4px; font-weight: 700; font-size: 10px;" title="Certificado firmado pero sin registro de CRM Salida">⚠️ Atascada</span>'
@@ -439,45 +437,32 @@ def render_tablero_fluido():
 
     if df_main is not None and not df_main.empty:
         mapa_cols = {}
-        for col in df_main.columns:
-            c_upper = str(col).upper()
+        cols_raw = list(df_main.columns)
+
+        for idx, col in enumerate(cols_raw):
+            c_upper = str(col).upper().strip()
             if "FECHA" in c_upper and "Fecha" not in mapa_cols.values():
                 mapa_cols[col] = "Fecha"
-            elif (
-                ("ORDEN" in c_upper or "ORD" in c_upper)
-                and "# Orden" not in mapa_cols.values()
-            ):
+            elif (("ORDEN" in c_upper or "ORD" in c_upper) and "# Orden" not in mapa_cols.values()):
                 mapa_cols[col] = "# Orden"
-            elif (
-                "RESPONSABLE" in c_upper
-                and "Responsables" not in mapa_cols.values()
-            ):
+            elif (("RESP" in c_upper or "RESPONSABLE" in c_upper or "ENCARGADO" in c_upper) and "Responsables" not in mapa_cols.values()):
                 mapa_cols[col] = "Responsables"
-            elif (
-                "CER" in c_upper
-                and "FIRM" in c_upper
-                and "Cer firmado" not in mapa_cols.values()
-            ):
+            elif ("CER" in c_upper and "FIRM" in c_upper) and "Cer firmado" not in mapa_cols.values():
                 mapa_cols[col] = "Cer firmado"
             elif "ENV" in c_upper and "Enviado" not in mapa_cols.values():
                 mapa_cols[col] = "Enviado"
-            elif (
-                "CRM" in c_upper
-                and "SAL" in c_upper
-                and "CRM salida" not in mapa_cols.values()
-            ):
+            elif ("CRM" in c_upper and "SAL" in c_upper) and "CRM salida" not in mapa_cols.values():
                 mapa_cols[col] = "CRM salida"
-            elif (
-                ("APROB" in c_upper or "COMER" in c_upper)
-                and "Aprob. Comercial" not in mapa_cols.values()
-            ):
+            elif (("APROB" in c_upper or "COMER" in c_upper) and "Aprob. Comercial" not in mapa_cols.values()):
                 mapa_cols[col] = "Aprob. Comercial"
-            elif (
-                "CRM" in c_upper
-                and "CERT" in c_upper
-                and "CRM cert." not in mapa_cols.values()
-            ):
+            elif ("CRM" in c_upper and "CERT" in c_upper) and "CRM cert." not in mapa_cols.values():
                 mapa_cols[col] = "CRM cert."
+
+        # Fallback por posición: si "Responsables" aún no fue mapeado y la tabla tiene >= 3 columnas
+        if "Responsables" not in mapa_cols.values() and len(cols_raw) >= 3:
+            col_pos2 = cols_raw[2]
+            if col_pos2 not in mapa_cols:
+                mapa_cols[col_pos2] = "Responsables"
 
         df_renamed = df_main.rename(columns=mapa_cols)
 
@@ -609,14 +594,14 @@ def render_tablero_fluido():
             if st.button("⬆️ Subir"):
                 st.session_state.page_index = max(0, st.session_state.page_index - 1)
                 st.session_state.last_switch_time = time.time()
-                st.session_state.manual_nav_bonus = 30  # Bonus +30s por clic manual
+                st.session_state.manual_nav_bonus = 30
                 st.rerun()
 
         with col_btn2:
             if st.button("⬇️ Bajar"):
                 st.session_state.page_index += 1
                 st.session_state.last_switch_time = time.time()
-                st.session_state.manual_nav_bonus = 30  # Bonus +30s por clic manual
+                st.session_state.manual_nav_bonus = 30
                 st.rerun()
 
         with col_search:
@@ -650,13 +635,11 @@ def render_tablero_fluido():
         df_pagina = df_vista.iloc[inicio:fin]
         cant_items_pagina = len(df_pagina)
 
-        # Duración base según la página
         if p_idx == 0:
-            duracion_base = 180  # 3 minutos fijos para la página principal
+            duracion_base = 180  # 3 minutos fijos para la primera página
         else:
             duracion_base = max(15, int(60 * (cant_items_pagina / filas_por_pagina)))
 
-        # Sumamos bonus manual si aplica
         duracion_total = duracion_base + st.session_state.get("manual_nav_bonus", 0)
 
         ahora = time.time()
