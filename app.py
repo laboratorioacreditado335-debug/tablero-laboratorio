@@ -4,6 +4,7 @@ import urllib.parse
 import numpy as np
 import pandas as pd
 import streamlit as st
+import streamlit.components.v1 as components
 
 # ---------------------------------------------------------
 # CONFIGURACIÓN DE PÁGINA Y ESTILOS MODO OSCURO (ESCALA 125% OPTIMIZADA)
@@ -119,6 +120,8 @@ if "search_term" not in st.session_state:
     st.session_state.search_term = ""
 if "manual_nav_bonus" not in st.session_state:
     st.session_state.manual_nav_bonus = 0
+if "last_alarm_id" not in st.session_state:
+    st.session_state.last_alarm_id = None
 
 
 # ---------------------------------------------------------
@@ -238,6 +241,21 @@ def cargar_datos_gsheets():
         df_proceso_raw = leer_hoja_google("C. Proceso órdenes", header_none=True)
         df_notas_raw = leer_hoja_google("NOTAS DEL DIA")
 
+        # Extracción de la señal de alarma desde Celda D2 de NOTAS DEL DIA
+        alarm_trigger_val = None
+        if df_notas_raw is not None and not df_notas_raw.empty:
+            try:
+                if df_notas_raw.shape[1] > 3:
+                    v_d2 = str(df_notas_raw.iloc[0, 3]).strip()
+                    if v_d2 and v_d2.lower() not in ["nan", "none", "null", ""]:
+                        alarm_trigger_val = v_d2
+                    else:
+                        c_d2 = str(df_notas_raw.columns[3]).strip()
+                        if c_d2 and not c_d2.startswith("Unnamed") and c_d2.lower() not in ["nan", "none", "null", ""]:
+                            alarm_trigger_val = c_d2
+            except Exception:
+                pass
+
         df_proceso = pd.DataFrame()
 
         if df_proceso_raw is not None and not df_proceso_raw.empty:
@@ -282,10 +300,10 @@ def cargar_datos_gsheets():
             df_notas.columns = [str(col).strip() for col in df_notas.columns]
             df_notas = df_notas.replace("", np.nan).dropna(how="all")
 
-        return df_proceso, df_notas, "Conectado correctamente"
+        return df_proceso, df_notas, "Conectado correctamente", alarm_trigger_val
 
     except Exception as e:
-        return None, None, f"Error al conectar con Google Sheets: {str(e)}"
+        return None, None, f"Error al conectar con Google Sheets: {str(e)}", None
 
 
 def render_dark_table(df_page):
@@ -380,7 +398,7 @@ def render_dark_table(df_page):
             html += f'<td style="{td_style}">{badge}</td>'
         html += "</tr>"
 
-    html += "</tbody></table></div>"
+    html += "</tbody>mtable></div>"
     return html
 
 
@@ -437,7 +455,54 @@ def render_bitacora_card(prioridad_val, descripcion_val, estado_val):
 # ---------------------------------------------------------
 @st.fragment(run_every=5)
 def render_tablero_fluido():
-    df_main, df_bitacora, info_estado = cargar_datos_gsheets()
+    df_main, df_bitacora, info_estado, alarm_val = cargar_datos_gsheets()
+
+    # DETECCIÓN Y ACTIVACIÓN DE LA ALARMA SONORA EN TIEMPO REAL
+    if alarm_val is not None:
+        if st.session_state.last_alarm_id is None:
+            st.session_state.last_alarm_id = alarm_val
+        elif st.session_state.last_alarm_id != alarm_val:
+            st.session_state.last_alarm_id = alarm_val
+            components.html(
+                """
+                <script>
+                (function() {
+                    try {
+                        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                        const now = ctx.currentTime;
+                        
+                        // Nota 1 (Mi / E5) - Tono suave
+                        const osc1 = ctx.createOscillator();
+                        const gain1 = ctx.createGain();
+                        osc1.type = 'sine';
+                        osc1.frequency.setValueAtTime(659.25, now);
+                        gain1.gain.setValueAtTime(0.3, now);
+                        gain1.gain.exponentialRampToValueAtTime(0.0001, now + 1.2);
+                        osc1.connect(gain1);
+                        gain1.connect(ctx.destination);
+                        osc1.start(now);
+                        osc1.stop(now + 1.2);
+
+                        // Nota 2 (Si / B5) - Timbre armónico
+                        const osc2 = ctx.createOscillator();
+                        const gain2 = ctx.createGain();
+                        osc2.type = 'sine';
+                        osc2.frequency.setValueAtTime(987.77, now + 0.15);
+                        gain2.gain.setValueAtTime(0.4, now + 0.15);
+                        gain2.gain.exponentialRampToValueAtTime(0.0001, now + 1.8);
+                        osc2.connect(gain2);
+                        gain2.connect(ctx.destination);
+                        osc2.start(now + 0.15);
+                        osc2.stop(now + 1.8);
+                    } catch(e) {
+                        console.error("Audio error:", e);
+                    }
+                })();
+                </script>
+                """,
+                height=0,
+                width=0,
+            )
 
     cols_deseadas = [
         "Fecha",
@@ -521,7 +586,6 @@ def render_tablero_fluido():
                 ],
                 np.nan,
             )
-            # Manejo de nulos de forma segura para compatibilidad con Pandas nuevos
             df_vista["Fecha_Raw"] = df_vista["Fecha_Raw"].ffill()
 
         df_vista[col_ord_main] = df_vista[col_ord_main].apply(limpiar_texto)
