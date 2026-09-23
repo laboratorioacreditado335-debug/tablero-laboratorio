@@ -4,6 +4,7 @@ import gspread
 from google.oauth2.service_account import Credentials
 import time
 from datetime import datetime
+import json
 
 # ==========================================
 # CONFIGURACIÓN DE LA PÁGINA
@@ -192,7 +193,7 @@ CUSTOM_CSS = """
 st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
 
 # ==========================================
-# CONEXIÓN ADAPTATIVA A GOOGLE SHEETS
+# CONEXIÓN BÚSQUEDA EXACTA DE CREDENCIALES
 # ==========================================
 @st.cache_resource
 def get_gspread_client():
@@ -201,25 +202,36 @@ def get_gspread_client():
         "https://www.googleapis.com/auth/drive"
     ]
     
-    # Búsqueda segura y adaptativa de credenciales en st.secrets
     creds_dict = None
-    if "gcp_service_account" in st.secrets:
-        creds_dict = dict(st.secrets["gcp_service_account"])
-    elif "google_credentials" in st.secrets:
-        creds_dict = dict(st.secrets["google_credentials"])
-    elif "gsheets" in st.secrets:
-        creds_dict = dict(st.secrets["gsheets"])
-    elif "connections" in st.secrets and "gsheets" in st.secrets["connections"]:
-        creds_dict = dict(st.secrets["connections"]["gsheets"])
+
+    # 1. Verificar si la raíz de secrets tiene los datos directos
+    if "client_email" in st.secrets and "private_key" in st.secrets:
+        creds_dict = dict(st.secrets)
     else:
-        # Si las claves de credencial están en la raíz de st.secrets
-        creds_dict = {
-            k: v for k, v in st.secrets.items() 
-            if k not in ["SPREADSHEET_ID", "connections"] and isinstance(v, (str, int))
-        }
-    
-    # Formatear la clave privada en caso de caracteres escapados
-    if creds_dict and "private_key" in creds_dict and isinstance(creds_dict["private_key"], str):
+        # 2. Buscar en todas las secciones/bloques de secrets el objeto real de credenciales
+        for key, val in st.secrets.items():
+            if hasattr(val, "get") or isinstance(val, dict):
+                if "client_email" in val and "private_key" in val:
+                    creds_dict = dict(val)
+                    break
+            elif isinstance(val, str) and "client_email" in val and "private_key" in val:
+                try:
+                    creds_dict = json.loads(val)
+                    break
+                except Exception:
+                    pass
+        
+        # 3. Buscar en conexiones integradas (connections.gsheets)
+        if not creds_dict and "connections" in st.secrets and "gsheets" in st.secrets["connections"]:
+            conn = st.secrets["connections"]["gsheets"]
+            if "client_email" in conn and "private_key" in conn:
+                creds_dict = dict(conn)
+
+    if not creds_dict:
+        raise ValueError("No se encontraron credenciales válidas en st.secrets (debe incluir 'client_email' y 'private_key').")
+
+    # Formatear saltos de línea de la clave privada
+    if "private_key" in creds_dict and isinstance(creds_dict["private_key"], str):
         creds_dict["private_key"] = creds_dict["private_key"].replace("\\n", "\n")
 
     creds = Credentials.from_service_account_info(creds_dict, scopes=scope)
