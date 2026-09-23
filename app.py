@@ -7,6 +7,11 @@ import streamlit as st
 import streamlit.components.v1 as components
 
 # ---------------------------------------------------------
+# ID DEL NUEVO GOOGLE SHEET
+# ---------------------------------------------------------
+SPREADSHEET_ID = "1CvPEtDspm7g3T7yXDluEUD7kGyWH5abNAP1nkalX6sI"
+
+# ---------------------------------------------------------
 # AUDIO EN BASE64 (CHIME DE NOTIFICACIÓN LOUD & CLEAN)
 # ---------------------------------------------------------
 AUDIO_BASE64 = (
@@ -17,7 +22,7 @@ AUDIO_BASE64 = (
 )
 
 # ---------------------------------------------------------
-# CONFIGURACIÓN DE PÁGINA Y ESTILOS MODO OSCURO (ESCALA 125% OPTIMIZADA)
+# CONFIGURACIÓN DE PÁGINA Y ESTILOS MODO OSCURO (ESCALA 125%)
 # ---------------------------------------------------------
 st.set_page_config(
     page_title="Tablero de Control - Laboratorio", page_icon="📊", layout="wide"
@@ -119,8 +124,6 @@ st.markdown(
 """,
     unsafe_allow_html=True,
 )
-
-SPREADSHEET_ID = "1bNDr35UasLS5zly1Sbq2ykbtmsTn9Fy4"
 
 if "page_index" not in st.session_state:
     st.session_state.page_index = 0
@@ -436,7 +439,6 @@ def render_tablero_fluido():
             st.session_state.last_alarm_id = alarm_val
         elif st.session_state.last_alarm_id != alarm_val:
             st.session_state.last_alarm_id = alarm_val
-            # Inyección de Audio Nativo HTML5 con Autoplay
             components.html(
                 f"""
                 <div style="display:none;">
@@ -688,7 +690,6 @@ def render_tablero_fluido():
         ahora = time.time()
         tiempo_transcurrido = ahora - st.session_state.last_switch_time
 
-        # CORREGIDO: st.session_state.last_switch_time = time.time()
         if tiempo_transcurrido >= duracion_total and total_paginas > 1:
             st.session_state.page_index = (st.session_state.page_index + 1) % total_paginas
             st.session_state.last_switch_time = time.time()
