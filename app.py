@@ -107,7 +107,7 @@ st.markdown("""
         background-color: #1F2937;
     }
 
-    /* Tarjeta del Progreso del Día */
+    /* Tarjetas de Progreso */
     .progress-order-card {
         background-color: #111827;
         border: 1px solid #1F2937;
@@ -159,7 +159,7 @@ def cargar_datos_gsheets():
         except Exception:
             df_notas = pd.DataFrame(columns=["Prioridad", "Nota", "Estado"])
 
-        if df_ordenes.empty:
+        if df_ordenes is None or df_ordenes.empty:
             return pd.DataFrame(), df_notas
 
         # Resolviendo celdas combinadas en columna Fecha
@@ -177,7 +177,7 @@ def cargar_datos_gsheets():
         return pd.DataFrame(), pd.DataFrame()
 
 # -----------------------------------------------------------------------------
-# 3. FUNCIONES DE RENDEREIZADO COMPONENTES HTML
+# 3. FUNCIONES DE RENDERIZADO COMPONENTES HTML
 # -----------------------------------------------------------------------------
 def render_kpis(df):
     """Muestra las 4 tarjetas KPI principales."""
@@ -260,10 +260,7 @@ def render_dark_table(df_page):
     st.markdown(html_code, unsafe_allow_html=True)
 
 def render_progreso_dia_card(orden_num, porcentaje):
-    """
-    Renderiza cada tarjeta individual de progreso garantizando la inyección correcta de HTML.
-    Corrección de bug: Se asegura el paso de unsafe_allow_html=True.
-    """
+    """Renderiza cada tarjeta individual de progreso del día."""
     card_html = f'''
     <div class="progress-order-card">
         <div style="display: flex; justify-content: space-between; align-items: center;">
@@ -278,11 +275,11 @@ def render_progreso_dia_card(orden_num, porcentaje):
     st.markdown(card_html, unsafe_allow_html=True)
 
 def render_bitacora_card(nota_text, prioridad="Normal"):
-    """Renderiza tarjetas de avisos/bitacora."""
+    """Renderiza tarjetas de avisos/bitácora."""
     border_color = "#3B82F6"
-    if prioridad.lower() == "alta":
+    if str(prioridad).lower() == "alta":
         border_color = "#EF4444"
-    elif prioridad.lower() == "media":
+    elif str(prioridad).lower() == "media":
         border_color = "#F59E0B"
 
     bitacora_html = f'''
@@ -298,7 +295,7 @@ def render_bitacora_card(nota_text, prioridad="Normal"):
 # -----------------------------------------------------------------------------
 @st.fragment(run_every=5)
 def render_tablero_fluido():
-    """Fragmento sin recarga total del navegador."""
+    """Fragmento de actualización automática vía WebSockets."""
     
     # Cargar datos actualizados
     df_ordenes, df_notas = cargar_datos_gsheets()
@@ -350,12 +347,12 @@ def render_tablero_fluido():
         else:
             st.caption("Sin registros programados.")
 
-    # Columna 2: PROGRESO DEL DÍA (Título exacto corregido)
+    # Columna 2: PROGRESO DEL DÍA
     with col_med:
         st.markdown("### PROGRESO DEL DÍA")
         
         # Progreso general promedio
-        promedio_general = 20  # Valor dinámico / calculado
+        promedio_general = 20
         
         general_card_html = f'''
         <div class="progress-order-card" style="border-color: #3B82F6;">
@@ -370,12 +367,11 @@ def render_tablero_fluido():
         '''
         st.markdown(general_card_html, unsafe_allow_html=True)
 
-        # Tarjetas individuales de progreso (Sin error de HTML impreso)
+        # Tarjetas individuales de progreso
         if not df_ordenes.empty:
             sample_orders = df_ordenes.head(3)
             for _, row in sample_orders.iterrows():
                 num_orden = row.get('Orden', '44962')
-                # Renderizado sin fallas con unsafe_allow_html=True
                 render_progreso_dia_card(num_orden, 20)
         else:
             render_progreso_dia_card("44962", 20)
