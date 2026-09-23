@@ -100,9 +100,9 @@ if "last_switch_time" not in st.session_state:
 
 
 # ---------------------------------------------------------
-# FUNCIONES AUXILIARES Y PARSER ROBUSTO DE FECHAS
+# FUNCIONES AUXILIARES Y LECTURA
 # ---------------------------------------------------------
-def limpiar_texto(val):
+def limpiar_numero(val):
   if pd.isna(val) or val is None:
     return ""
   val_str = str(val).strip()
@@ -125,19 +125,16 @@ def parsear_fecha(val):
     return None
   if isinstance(val, (datetime, pd.Timestamp)):
     return val.date()
-
   val_str = str(val).strip()
   if (
-      not val_str
-      or val_str.lower() in ["nan", "none", "nat", "null"]
+      val_str.lower() in ["", "nan", "none", "nat", "null"]
       or val_str.startswith("#")
   ):
     return None
 
-  # Número de serie Excel (ej. 46288)
   try:
     num_val = float(val_str)
-    if 30000 < num_val < 70000:
+    if 35000 < num_val < 65000:
       dt = pd.to_datetime(num_val, unit="D", origin="1899-12-30")
       return dt.date()
   except (ValueError, TypeError):
@@ -145,21 +142,20 @@ def parsear_fecha(val):
 
   val_clean = val_str.split(" ")[0].strip()
 
-  # M/D/YYYY o YYYY-MM-DD
   try:
-    dt = pd.to_datetime(val_clean, dayfirst=False, errors="coerce")
+    dt = pd.to_datetime(val_clean, errors="coerce", format="mixed")
     if pd.notna(dt):
       return dt.date()
   except Exception:
     pass
 
-  # D/M/YYYY
-  try:
-    dt = pd.to_datetime(val_clean, dayfirst=True, errors="coerce")
-    if pd.notna(dt):
-      return dt.date()
-  except Exception:
-    pass
+  for df_flag in [False, True]:
+    try:
+      dt = pd.to_datetime(val_clean, dayfirst=df_flag, errors="coerce")
+      if pd.notna(dt):
+        return dt.date()
+    except Exception:
+      pass
 
   return None
 
@@ -189,6 +185,22 @@ def cargar_datos_gsheets():
         df_proceso.columns = [
             str(c).strip() for c in df_proceso_raw.iloc[0].values
         ]
+
+      col_fecha = next(
+          (c for c in df_proceso.columns if "FECHA" in str(c).upper()), None
+      )
+      if not col_fecha and len(df_proceso.columns) > 0:
+        col_fecha = df_proceso.columns[0]
+
+      if col_fecha:
+        if col_fecha != "Fecha":
+          df_proceso.rename(columns={col_fecha: "Fecha"}, inplace=True)
+
+        # RELLENO HACIA ABAJO (FFILL) PARA DESCOMBINAR CELDAS DE EXCEL
+        df_proceso["Fecha"] = df_proceso["Fecha"].replace(
+            ["", "nan", "none", "null", "nat", "NaN", "None"], np.nan
+        )
+        df_proceso["Fecha"] = df_proceso["Fecha"].ffill()
 
     df_notas = pd.DataFrame()
     if df_notas_raw is not None and not df_notas_raw.empty:
@@ -275,7 +287,7 @@ def render_dark_table(df_page):
 
     html += f"<tr {tr_style}>"
     for h in headers:
-      val = limpiar_texto(row[h])
+      val = limpiar_numero(row[h])
 
       if h == col_orden and es_atascada:
         badge = f'{val} <span style="background-color: rgba(245, 158, 11, 0.25); color: #FBBF24; border: 1px solid #F59E0B; padding: 2px 7px; border-radius: 8px; font-weight: 700; font-size: 10.5px; margin-left: 6px;" title="Certificado firmado pero sin registro de CRM Salida">⚠️ Atascada</span>'
@@ -344,7 +356,7 @@ def render_bitacora_card(prioridad_val, descripcion_val, estado_val):
 
 
 # ---------------------------------------------------------
-# TABLERO DE CONTROL DINÁMICO Y FLUIDO
+# TABLERO DE CONTROL DINÁMICO
 # ---------------------------------------------------------
 @st.fragment(run_every=5)
 def render_tablero_fluido():
@@ -375,7 +387,6 @@ def render_tablero_fluido():
   total_pend = 0
 
   if df_main is not None and not df_main.empty:
-    # Mapeo de columnas dinámico
     mapa_cols = {}
     for col in df_main.columns:
       c_upper = str(col).upper()
@@ -412,13 +423,17 @@ def render_tablero_fluido():
       ):
         mapa_cols[col] = "CRM cert."
 
-    df_renamed = df_main.rename(columns=mapa_cols)
+    df_main_renamed = df_main.rename(columns=mapa_cols)
 
-    if "Fecha" not in df_renamed.columns and len(df_renamed.columns) > 0:
-      df_renamed.rename(columns={df_renamed.columns[0]: "Fecha"}, inplace=True)
+    if (
+        "Fecha" not in df_main_renamed.columns
+        and len(df_main_renamed.columns) > 0
+    ):
+      first_col = df_main_renamed.columns[0]
+      df_main_renamed.rename(columns={first_col: "Fecha"}, inplace=True)
 
-    cols_existentes = [c for c in cols_deseadas if c in df_renamed.columns]
-    df_vista = df_renamed[cols_existentes].copy()
+    cols_existentes = [c for c in cols_deseadas if c in df_main_renamed.columns]
+    df_vista = df_main_renamed[cols_existentes].copy()
 
     col_ord_main = (
         "# Orden"
@@ -426,53 +441,29 @@ def render_tablero_fluido():
         else cols_existentes[min(1, len(cols_existentes) - 1)]
     )
 
-    # 1. PROPAGACIÓN VERTICAL DE FECHAS (FFILL PARA CELDAS COMBINADAS EN EXCEL)
-    if "Fecha" in df_vista.columns:
-      df_vista["Fecha_Raw"] = df_vista["Fecha"].astype(str).str.strip()
-      df_vista["Fecha_Raw"] = df_vista["Fecha_Raw"].replace(
-          [
-              "",
-              "nan",
-              "none",
-              "null",
-              "nat",
-              "NaN",
-              "None",
-              "#ERROR!",
-              "#N/A",
-              "#VALOR!",
-          ],
-          np.nan,
-      )
-      df_vista["Fecha_Raw"] = df_vista["Fecha_Raw"].ffill()
+    df_vista[col_ord_main] = df_vista[col_ord_main].apply(limpiar_numero)
 
-    # 2. FILTRADO DE FILAS VÁLIDAS DE ÓRDENES
-    df_vista[col_ord_main] = df_vista[col_ord_main].apply(limpiar_texto)
     df_vista = df_vista[
         df_vista[col_ord_main].notna()
-        & (df_vista[col_ord_main] != "")
+        & (df_vista[col_ord_main].astype(str).str.strip() != "")
         & (
             ~df_vista[col_ord_main]
+            .astype(str)
+            .str.strip()
             .str.lower()
-            .isin(["nan", "none", "null", "nat", "#orden"])
+            .isin(["nan", "none", "null", "nat"])
         )
-        & (~df_vista[col_ord_main].str.startswith("#"))
     ].copy()
 
-    if "Fecha_Raw" in df_vista.columns:
-      df_vista["Fecha_dt"] = df_vista["Fecha_Raw"].apply(parsear_fecha)
+    if "Fecha" in df_vista.columns:
+      # RELLENO SECUNDARIO DE FECHA POR SEGURIDAD
+      df_vista["Fecha"] = df_vista["Fecha"].replace(
+          ["", "nan", "none", "null", "nat", "NaN", "None"], np.nan
+      )
+      df_vista["Fecha"] = df_vista["Fecha"].ffill()
+      df_vista["Fecha_dt"] = df_vista["Fecha"].apply(parsear_fecha)
 
-      # Asignación visual de la columna 'Fecha' (Sin celdas vacías)
-      def formatear_fecha_mostrar(row):
-        dt = row["Fecha_dt"]
-        if pd.notna(dt) and dt is not None:
-          return dt.strftime("%d/%m/%Y")
-        raw = str(row["Fecha_Raw"]).strip()
-        return raw if raw and raw.lower() != "nan" else ""
-
-      df_vista["Fecha"] = df_vista.apply(formatear_fecha_mostrar, axis=1)
-
-      # Totales KPIs Globales
+      # Conteo Global
       total_reg = len(df_vista)
       if "Cer firmado" in df_vista.columns:
         total_firm = (
@@ -494,38 +485,40 @@ def render_tablero_fluido():
         )
       total_pend = max(0, total_reg - total_env)
 
-      # 🎯 OBTENER DINÁMICAMENTE LAS ÓRDENES DE HOY DESDE EL EXCEL
+      # 🎯 OBTENER ÓRDENES CORRESPONDIENTES A HOY
       df_hoy = df_vista[df_vista["Fecha_dt"] == hoy_dt]
 
-      # Respaldo en caso de desfase de fecha de servidor: usar el último día presente en el Excel
-      if df_hoy.empty and not df_vista["Fecha_dt"].dropna().empty:
-        max_dt = df_vista["Fecha_dt"].dropna().max()
-        df_hoy = df_vista[df_vista["Fecha_dt"] == max_dt]
-        fecha_activa_str = max_dt.strftime("%d/%m/%Y")
-      else:
-        fecha_activa_str = hoy_dt.strftime("%d/%m/%Y")
+      if not df_hoy.empty:
+        ordenes_raw = df_hoy[col_ord_main].dropna().tolist()
+        ordenes_hoy = [
+            o
+            for o in dict.fromkeys(ordenes_raw)
+            if o and str(o).lower() != "nan"
+        ]
+        total_hoy = len(ordenes_hoy)
 
-      ordenes_raw = df_hoy[col_ord_main].dropna().tolist()
-      ordenes_hoy = list(dict.fromkeys(ordenes_raw))
-      total_hoy = len(ordenes_hoy)
-
-      if total_hoy > 0:
         for _, row in df_hoy.iterrows():
           env_v = str(row.get("Enviado", "")).strip().upper()
           cer_v = str(row.get("Cer firmado", "")).strip().upper()
           if env_v in ["SI", "SÍ"] or cer_v in ["SI", "SÍ"]:
             cumplidos_hoy += 1
 
-        porcentaje_hoy = int((cumplidos_hoy / total_hoy) * 100)
+        porcentaje_hoy = (
+            int((cumplidos_hoy / total_hoy) * 100) if total_hoy > 0 else 0
+        )
 
-      # Ordenar por fecha descendente (lo más reciente arriba, en la Página 1)
+      # Ordenar por fecha más reciente (hoy primero)
       df_vista = df_vista.sort_values(
           by=["Fecha_dt", col_ord_main], ascending=[False, True]
       ).reset_index(drop=True)
 
-      df_vista = df_vista.drop(
-          columns=["Fecha_dt", "Fecha_Raw"], errors="ignore"
+      # ASIGNAR LA FECHA FORMATEADA A CADA FILA SIN DEJAR CELDAS VACÍAS
+      df_vista["Fecha"] = df_vista["Fecha_dt"].apply(
+          lambda d: d.strftime("%d/%m/%Y")
+          if pd.notna(d) and d is not None
+          else ""
       )
+      df_vista = df_vista.drop(columns=["Fecha_dt"], errors="ignore")
 
   # 1. KPIs SUPERIORES
   col1, col2, col3, col4 = st.columns(4)
@@ -557,7 +550,7 @@ def render_tablero_fluido():
 
   st.markdown("<br>", unsafe_allow_html=True)
 
-  # 2. TABLA PRINCIPAL CON NAVEGACIÓN
+  # 2. TABLA PRINCIPAL CON NAVEGACIÓN Y ROTACIÓN
   if df_vista is not None and not df_vista.empty:
     filas_por_pagina = 8
     total_filas = len(df_vista)
@@ -626,7 +619,7 @@ def render_tablero_fluido():
   with c_left:
     st.markdown("### 🚚 Programadas p/ Hoy")
     st.caption(
-        f"🗓️ Fecha activa: **{fecha_activa_str}** | {total_hoy} órdenes"
+        f"🗓️ Fecha actual: **{fecha_activa_str}** | {total_hoy} órdenes"
         " agendadas"
     )
     if ordenes_hoy:
