@@ -134,12 +134,17 @@ def limpiar_texto(val):
 
 
 def leer_hoja_google(nombre_hoja, header_none=False):
+    """
+    Lee una pestaña de Google Sheets en formato CSV.
+    Se incluye `keep_default_na=False` para evitar que las iniciales 'NA'
+    (Nicolás Arévalo) sean convertidas automáticamente a valores nulos (NaN).
+    """
     nombre_enc = urllib.parse.quote(nombre_hoja)
     nocache = int(time.time())
     url = f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet={nombre_enc}&_cb={nocache}"
     if header_none:
-        return pd.read_csv(url, header=None)
-    return pd.read_csv(url)
+        return pd.read_csv(url, header=None, keep_default_na=False)
+    return pd.read_csv(url, keep_default_na=False)
 
 
 def parsear_fecha(val):
@@ -275,7 +280,7 @@ def cargar_datos_gsheets():
                 df_notas = df_notas_raw.copy()
 
             df_notas.columns = [str(col).strip() for col in df_notas.columns]
-            df_notas = df_notas.dropna(how="all")
+            df_notas = df_notas.replace("", np.nan).dropna(how="all")
 
         return df_proceso, df_notas, "Conectado correctamente"
 
