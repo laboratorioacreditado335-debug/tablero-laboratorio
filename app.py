@@ -582,27 +582,22 @@ def render_tablero_fluido():
     col1, col2, col3, col4 = st.columns(4)
     with col1:
         st.markdown(
-            f'<div class="kpi-card"><div'
-            ' class="kpi-title">REGISTRADAS</div><div'
-            f' class="kpi-value">{total_reg}</div></div>',
+            f'<div class="kpi-card"><div class="kpi-title">REGISTRADAS</div><div class="kpi-value">{total_reg}</div></div>',
             unsafe_allow_html=True,
         )
     with col2:
         st.markdown(
-            f'<div class="kpi-card"><div class="kpi-title">FIRMADAS ✏️</div><div'
-            f' class="kpi-value">{total_firm}</div></div>',
+            f'<div class="kpi-card"><div class="kpi-title">FIRMADAS ✏️</div><div class="kpi-value">{total_firm}</div></div>',
             unsafe_allow_html=True,
         )
     with col3:
         st.markdown(
-            f'<div class="kpi-card"><div class="kpi-title">ENVIADAS 📦</div><div'
-            f' class="kpi-value">{total_env}</div></div>',
+            f'<div class="kpi-card"><div class="kpi-title">ENVIADAS 📦</div><div class="kpi-value">{total_env}</div></div>',
             unsafe_allow_html=True,
         )
     with col4:
         st.markdown(
-            f'<div class="kpi-card"><div class="kpi-title">PENDIENTES ⌛</div><div'
-            f' class="kpi-value">{total_pend}</div></div>',
+            f'<div class="kpi-card"><div class="kpi-title">PENDIENTES ⌛</div><div class="kpi-value">{total_pend}</div></div>',
             unsafe_allow_html=True,
         )
 
@@ -708,38 +703,36 @@ def render_tablero_fluido():
         acumulado_general = int(np.mean([p[1] for p in progresos])) if progresos else 0
         st.caption(f"📊 Acumulado del Día: **{acumulado_general}%**")
 
-        # Barra de Acumulado General del Día
+        # Barra de Acumulado General del Día (HTML sin sangría interna para evitar bloques de código)
         st.markdown(
-            f"""
-            <div style="background-color: #111827; border: 1px solid #1F2937; border-radius: 6px; padding: 10px 12px; margin-bottom: 8px;">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-                    <span style="font-size: 11px; font-weight: 700; color: #9CA3AF; letter-spacing: 0.5px;">PROMEDIO GENERAL DEL DÍA</span>
-                    <span style="font-size: 16px; font-weight: 800; color: #38BDF8;">{acumulado_general}%</span>
-                </div>
-                <div style="background-color: #1F2937; border-radius: 10px; height: 10px; width: 100%; overflow: hidden;">
-                    <div style="background: linear-gradient(90deg, #3B82F6, #10B981); height: 100%; width: {acumulado_general}%; border-radius: 10px; transition: width 0.5s ease-in-out;"></div>
-                </div>
-            </div>
-            """,
+            f'<div style="background-color: #111827; border: 1px solid #1F2937; border-radius: 6px; padding: 10px 12px; margin-bottom: 8px;">'
+            f'<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">'
+            f'<span style="font-size: 11px; font-weight: 700; color: #9CA3AF; letter-spacing: 0.5px;">PROMEDIO GENERAL DEL DÍA</span>'
+            f'<span style="font-size: 16px; font-weight: 800; color: #38BDF8;">{acumulado_general}%</span>'
+            f'</div>'
+            f'<div style="background-color: #1F2937; border-radius: 10px; height: 10px; width: 100%; overflow: hidden;">'
+            f'<div style="background: linear-gradient(90deg, #3B82F6, #10B981); height: 100%; width: {acumulado_general}%; border-radius: 10px; transition: width 0.5s ease-in-out;"></div>'
+            f'</div>'
+            f'</div>',
             unsafe_allow_html=True,
         )
 
-        # Listado de avance individual por orden
+        # Listado de avance individual por orden (HTML sin sangría para renderizado nativo perfecto)
         if progresos:
             html_progresos = '<div style="display: flex; flex-direction: column; gap: 4px;">'
             for ord_num, pct in progresos:
                 bar_color = "#10B981" if pct == 100 else ("#3B82F6" if pct >= 60 else "#F59E0B")
-                html_progresos += f"""
-                <div class="progress-order-card">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
-                        <span style="font-size: 12px; font-weight: 700; color: #F3F4F6;">Orden #{ord_num}</span>
-                        <span style="font-size: 11.5px; font-weight: 800; color: {bar_color};">{pct}%</span>
-                    </div>
-                    <div style="background-color: #1F2937; border-radius: 6px; height: 6px; width: 100%; overflow: hidden;">
-                        <div style="background-color: {bar_color}; height: 100%; width: {pct}%;"></div>
-                    </div>
-                </div>
-                """
+                html_progresos += (
+                    f'<div class="progress-order-card">'
+                    f'<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">'
+                    f'<span style="font-size: 12px; font-weight: 700; color: #F3F4F6;">Orden #{ord_num}</span>'
+                    f'<span style="font-size: 11.5px; font-weight: 800; color: {bar_color};">{pct}%</span>'
+                    f'</div>'
+                    f'<div style="background-color: #1F2937; border-radius: 6px; height: 6px; width: 100%; overflow: hidden;">'
+                    f'<div style="background-color: {bar_color}; height: 100%; width: {pct}%;"></div>'
+                    f'</div>'
+                    f'</div>'
+                )
             html_progresos += '</div>'
             st.markdown(html_progresos, unsafe_allow_html=True)
         else:
