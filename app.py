@@ -192,7 +192,7 @@ CUSTOM_CSS = """
 st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
 
 # ==========================================
-# CONEXIÓN A GOOGLE SHEETS
+# CONEXIÓN ADAPTATIVA A GOOGLE SHEETS
 # ==========================================
 @st.cache_resource
 def get_gspread_client():
@@ -200,7 +200,28 @@ def get_gspread_client():
         "https://spreadsheets.google.com/feeds",
         "https://www.googleapis.com/auth/drive"
     ]
-    creds_dict = dict(st.secrets["gcp_service_account"])
+    
+    # Búsqueda segura y adaptativa de credenciales en st.secrets
+    creds_dict = None
+    if "gcp_service_account" in st.secrets:
+        creds_dict = dict(st.secrets["gcp_service_account"])
+    elif "google_credentials" in st.secrets:
+        creds_dict = dict(st.secrets["google_credentials"])
+    elif "gsheets" in st.secrets:
+        creds_dict = dict(st.secrets["gsheets"])
+    elif "connections" in st.secrets and "gsheets" in st.secrets["connections"]:
+        creds_dict = dict(st.secrets["connections"]["gsheets"])
+    else:
+        # Si las claves de credencial están en la raíz de st.secrets
+        creds_dict = {
+            k: v for k, v in st.secrets.items() 
+            if k not in ["SPREADSHEET_ID", "connections"] and isinstance(v, (str, int))
+        }
+    
+    # Formatear la clave privada en caso de caracteres escapados
+    if creds_dict and "private_key" in creds_dict and isinstance(creds_dict["private_key"], str):
+        creds_dict["private_key"] = creds_dict["private_key"].replace("\\n", "\n")
+
     creds = Credentials.from_service_account_info(creds_dict, scopes=scope)
     return gspread.authorize(creds)
 
@@ -336,17 +357,17 @@ def render_tablero_fluido():
         return
 
     # --------------------------------------
-    # LÓGICA DE ALARMA SONORA
+    # LÓGICA DE ALARMA SONORA DE NOTIFICACIÓN
     # --------------------------------------
     if 'last_alarm' not in st.session_state:
         st.session_state['last_alarm'] = alarm_trigger
 
-    # Si cambia la marca de tiempo de la alarma en la celda E4
+    # Si cambia el valor de control en la celda E4
     if alarm_trigger != st.session_state['last_alarm'] and alarm_trigger != "0":
         st.session_state['last_alarm'] = alarm_trigger
-        st.toast("🔔 ¡NUEVA ALERTA RECIBIDA DE HOJA DE CÁLCULO!", icon="🔔")
+        st.toast("🔔 ¡NUEVA ALERTA RECIBIDA DESDE LA HOJA DE CÁLCULO!", icon="🔔")
         
-        # Audio melodioso (Chime) emitido vía HTML5
+        # Reproducción de tono melodioso tipo Chime por HTML5
         audio_html = """
             <audio autoplay style="display:none;">
                 <source src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3" type="audio/mpeg">
