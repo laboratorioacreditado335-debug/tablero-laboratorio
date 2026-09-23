@@ -239,20 +239,16 @@ def calcular_progreso_orden(row):
 def cargar_datos_gsheets():
     try:
         df_proceso_raw = leer_hoja_google("C. Proceso órdenes", header_none=True)
-        df_notas_raw = leer_hoja_google("NOTAS DEL DIA")
+        # Leemos NOTAS DEL DIA sin cabecera para ubicar exactamente la celda D2 (fila index 1, columna index 3)
+        df_notas_raw = leer_hoja_google("NOTAS DEL DIA", header_none=True)
 
-        # Extracción de la señal de alarma desde Celda D2 de NOTAS DEL DIA
         alarm_trigger_val = None
         if df_notas_raw is not None and not df_notas_raw.empty:
             try:
-                if df_notas_raw.shape[1] > 3:
-                    v_d2 = str(df_notas_raw.iloc[0, 3]).strip()
+                if df_notas_raw.shape[0] > 1 and df_notas_raw.shape[1] > 3:
+                    v_d2 = str(df_notas_raw.iloc[1, 3]).strip()
                     if v_d2 and v_d2.lower() not in ["nan", "none", "null", ""]:
                         alarm_trigger_val = v_d2
-                    else:
-                        c_d2 = str(df_notas_raw.columns[3]).strip()
-                        if c_d2 and not c_d2.startswith("Unnamed") and c_d2.lower() not in ["nan", "none", "null", ""]:
-                            alarm_trigger_val = c_d2
             except Exception:
                 pass
 
@@ -398,7 +394,7 @@ def render_dark_table(df_page):
             html += f'<td style="{td_style}">{badge}</td>'
         html += "</tr>"
 
-    html += "</tbody>mtable></div>"
+    html += "</tbody></table></div>"
     return html
 
 
@@ -457,7 +453,7 @@ def render_bitacora_card(prioridad_val, descripcion_val, estado_val):
 def render_tablero_fluido():
     df_main, df_bitacora, info_estado, alarm_val = cargar_datos_gsheets()
 
-    # DETECCIÓN Y ACTIVACIÓN DE LA ALARMA SONORA EN TIEMPO REAL
+    # CONTROL DE ALARMA SONORA ROBUSTO (MULTINAVEGADOR)
     if alarm_val is not None:
         if st.session_state.last_alarm_id is None:
             st.session_state.last_alarm_id = alarm_val
@@ -468,34 +464,43 @@ def render_tablero_fluido():
                 <script>
                 (function() {
                     try {
-                        const ctx = new (window.AudioContext || window.webkitAudioContext)();
-                        const now = ctx.currentTime;
+                        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
                         
-                        // Nota 1 (Mi / E5) - Tono suave
-                        const osc1 = ctx.createOscillator();
-                        const gain1 = ctx.createGain();
-                        osc1.type = 'sine';
-                        osc1.frequency.setValueAtTime(659.25, now);
-                        gain1.gain.setValueAtTime(0.3, now);
-                        gain1.gain.exponentialRampToValueAtTime(0.0001, now + 1.2);
-                        osc1.connect(gain1);
-                        gain1.connect(ctx.destination);
-                        osc1.start(now);
-                        osc1.stop(now + 1.2);
+                        function playBell() {
+                            const now = audioCtx.currentTime;
+                            
+                            // Nota 1 (Campana principal C5)
+                            const osc1 = audioCtx.createOscillator();
+                            const gain1 = audioCtx.createGain();
+                            osc1.type = 'sine';
+                            osc1.frequency.setValueAtTime(523.25, now);
+                            gain1.gain.setValueAtTime(0.5, now);
+                            gain1.gain.exponentialRampToValueAtTime(0.0001, now + 1.2);
+                            osc1.connect(gain1);
+                            gain1.connect(audioCtx.destination);
+                            osc1.start(now);
+                            osc1.stop(now + 1.2);
 
-                        // Nota 2 (Si / B5) - Timbre armónico
-                        const osc2 = ctx.createOscillator();
-                        const gain2 = ctx.createGain();
-                        osc2.type = 'sine';
-                        osc2.frequency.setValueAtTime(987.77, now + 0.15);
-                        gain2.gain.setValueAtTime(0.4, now + 0.15);
-                        gain2.gain.exponentialRampToValueAtTime(0.0001, now + 1.8);
-                        osc2.connect(gain2);
-                        gain2.connect(ctx.destination);
-                        osc2.start(now + 0.15);
-                        osc2.stop(now + 1.8);
+                            // Nota 2 (Armónico agudo G5)
+                            const osc2 = audioCtx.createOscillator();
+                            const gain2 = audioCtx.createGain();
+                            osc2.type = 'sine';
+                            osc2.frequency.setValueAtTime(783.99, now + 0.12);
+                            gain2.gain.setValueAtTime(0.6, now + 0.12);
+                            gain2.gain.exponentialRampToValueAtTime(0.0001, now + 1.8);
+                            osc2.connect(gain2);
+                            gain2.connect(audioCtx.destination);
+                            osc2.start(now + 0.12);
+                            osc2.stop(now + 1.8);
+                        }
+
+                        if (audioCtx.state === 'suspended') {
+                            audioCtx.resume().then(() => playBell()).catch(() => playBell());
+                        } else {
+                            playBell();
+                        }
                     } catch(e) {
-                        console.error("Audio error:", e);
+                        console.error("Error reproduciendo audio:", e);
                     }
                 })();
                 </script>
@@ -738,7 +743,7 @@ def render_tablero_fluido():
 
         if tiempo_transcurrido >= duracion_total and total_paginas > 1:
             st.session_state.page_index = (st.session_state.page_index + 1) % total_paginas
-            st.session_state.last_switch_time = ahora
+            st.session_state.last_switch_time = me
             st.session_state.manual_nav_bonus = 0
             st.rerun()
 
