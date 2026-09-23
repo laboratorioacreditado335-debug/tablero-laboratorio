@@ -117,6 +117,8 @@ if "last_switch_time" not in st.session_state:
     st.session_state.last_switch_time = time.time()
 if "search_term" not in st.session_state:
     st.session_state.search_term = ""
+if "manual_nav_bonus" not in st.session_state:
+    st.session_state.manual_nav_bonus = 0
 
 
 # ---------------------------------------------------------
@@ -596,12 +598,14 @@ def render_tablero_fluido():
             if st.button("⬆️ Subir"):
                 st.session_state.page_index = max(0, st.session_state.page_index - 1)
                 st.session_state.last_switch_time = time.time()
+                st.session_state.manual_nav_bonus = 30  # Bonus +30s por clic manual
                 st.rerun()
 
         with col_btn2:
             if st.button("⬇️ Bajar"):
                 st.session_state.page_index += 1
                 st.session_state.last_switch_time = time.time()
+                st.session_state.manual_nav_bonus = 30  # Bonus +30s por clic manual
                 st.rerun()
 
         with col_search:
@@ -621,32 +625,50 @@ def render_tablero_fluido():
                 df_vista[col_target].astype(str).str.lower().str.contains(term, na=False)
             ]
 
-        # 10 FILAS EN PANTALLA (REQUISITO MANTENIDO)
+        # CALCULOS DE PAGINACIÓN Y TIEMPOS INTELIGENTES
         filas_por_pagina = 10
         total_filas = len(df_vista)
         total_paginas = max(1, (total_filas + filas_por_pagina - 1) // filas_por_pagina)
 
-        ahora = time.time()
-        tiempo_permanencia = 120 if st.session_state.page_index == 0 else 60
-
-        if (ahora - st.session_state.last_switch_time) >= tiempo_permanencia and total_paginas > 1:
-            st.session_state.page_index = (st.session_state.page_index + 1) % total_paginas
-            st.session_state.last_switch_time = ahora
-
         if st.session_state.page_index >= total_paginas:
             st.session_state.page_index = 0
-
-        with col_info:
-            segundos_restantes = max(0, int(tiempo_permanencia - (ahora - st.session_state.last_switch_time)))
-            st.caption(
-                f"Pág. {st.session_state.page_index + 1}/{total_paginas} ({total_filas} reg.)"
-                f" | ⏱️ Rotación: {segundos_restantes}s"
-            )
 
         p_idx = st.session_state.page_index
         inicio = p_idx * filas_por_pagina
         fin = min(inicio + filas_por_pagina, total_filas)
         df_pagina = df_vista.iloc[inicio:fin]
+        cant_items_pagina = len(df_pagina)
+
+        # ---------------------------------------------------------------------
+        # REGLA DE TIEMPOS:
+        # Página 1 (p_idx == 0): 3 Minutos (180s)
+        # Páginas 2 en adelante: 60s para 10 ítems (proporcional si hay menos)
+        # ---------------------------------------------------------------------
+        if p_idx == 0:
+            duracion_base = 180  # 3 minutos fijos para la página principal
+        else:
+            # Proporcional según cantidad de filas (mínimo de resguardo 15s)
+            duracion_base = max(15, int(60 * (cant_items_pagina / filas_por_pagina)))
+
+        # Sumamos el bonus de +30s si fue navegación manual
+        duracion_total = duracion_base + st.session_state.get("manual_nav_bonus", 0)
+
+        ahora = time.time()
+        tiempo_transcurrido = ahora - st.session_state.last_switch_time
+
+        if tiempo_transcurrido >= duracion_total and total_paginas > 1:
+            st.session_state.page_index = (st.session_state.page_index + 1) % total_paginas
+            st.session_state.last_switch_time = ahora
+            st.session_state.manual_nav_bonus = 0  # Reiniciar bonus al pasar automáticamente
+            st.rerun()
+
+        with col_info:
+            segundos_restantes = max(0, int(duracion_total - tiempo_transcurrido))
+            bonus_str = " (+30s manual)" if st.session_state.get("manual_nav_bonus", 0) > 0 else ""
+            st.caption(
+                f"Pág. {p_idx + 1}/{total_paginas} ({total_filas} reg.)"
+                f" | ⏱️ Rotación: {segundos_restantes}s{bonus_str}"
+            )
 
         st.markdown(render_dark_table(df_pagina), unsafe_allow_html=True)
 
