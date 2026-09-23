@@ -4,7 +4,6 @@ import urllib.parse
 import numpy as np
 import pandas as pd
 import streamlit as st
-import streamlit.components.v1 as components
 
 # ---------------------------------------------------------
 # CONFIGURACIÓN DE PÁGINA Y ESTILOS MODO OSCURO (ESCALA 125% OPTIMIZADA)
@@ -120,8 +119,6 @@ if "search_term" not in st.session_state:
     st.session_state.search_term = ""
 if "manual_nav_bonus" not in st.session_state:
     st.session_state.manual_nav_bonus = 0
-if "last_alarm_id" not in st.session_state:
-    st.session_state.last_alarm_id = None
 
 
 # ---------------------------------------------------------
@@ -239,18 +236,7 @@ def calcular_progreso_orden(row):
 def cargar_datos_gsheets():
     try:
         df_proceso_raw = leer_hoja_google("C. Proceso órdenes", header_none=True)
-        # Leemos NOTAS DEL DIA sin cabecera para ubicar exactamente la celda D2 (fila index 1, columna index 3)
-        df_notas_raw = leer_hoja_google("NOTAS DEL DIA", header_none=True)
-
-        alarm_trigger_val = None
-        if df_notas_raw is not None and not df_notas_raw.empty:
-            try:
-                if df_notas_raw.shape[0] > 1 and df_notas_raw.shape[1] > 3:
-                    v_d2 = str(df_notas_raw.iloc[1, 3]).strip()
-                    if v_d2 and v_d2.lower() not in ["nan", "none", "null", ""]:
-                        alarm_trigger_val = v_d2
-            except Exception:
-                pass
+        df_notas_raw = leer_hoja_google("NOTAS DEL DIA")
 
         df_proceso = pd.DataFrame()
 
@@ -296,10 +282,10 @@ def cargar_datos_gsheets():
             df_notas.columns = [str(col).strip() for col in df_notas.columns]
             df_notas = df_notas.replace("", np.nan).dropna(how="all")
 
-        return df_proceso, df_notas, "Conectado correctamente", alarm_trigger_val
+        return df_proceso, df_notas, "Conectado correctamente"
 
     except Exception as e:
-        return None, None, f"Error al conectar con Google Sheets: {str(e)}", None
+        return None, None, f"Error al conectar con Google Sheets: {str(e)}"
 
 
 def render_dark_table(df_page):
@@ -451,63 +437,7 @@ def render_bitacora_card(prioridad_val, descripcion_val, estado_val):
 # ---------------------------------------------------------
 @st.fragment(run_every=5)
 def render_tablero_fluido():
-    df_main, df_bitacora, info_estado, alarm_val = cargar_datos_gsheets()
-
-    # CONTROL DE ALARMA SONORA ROBUSTO (MULTINAVEGADOR)
-    if alarm_val is not None:
-        if st.session_state.last_alarm_id is None:
-            st.session_state.last_alarm_id = alarm_val
-        elif st.session_state.last_alarm_id != alarm_val:
-            st.session_state.last_alarm_id = alarm_val
-            components.html(
-                """
-                <script>
-                (function() {
-                    try {
-                        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-                        
-                        function playBell() {
-                            const now = audioCtx.currentTime;
-                            
-                            // Nota 1 (Campana principal C5)
-                            const osc1 = audioCtx.createOscillator();
-                            const gain1 = audioCtx.createGain();
-                            osc1.type = 'sine';
-                            osc1.frequency.setValueAtTime(523.25, now);
-                            gain1.gain.setValueAtTime(0.5, now);
-                            gain1.gain.exponentialRampToValueAtTime(0.0001, now + 1.2);
-                            osc1.connect(gain1);
-                            gain1.connect(audioCtx.destination);
-                            osc1.start(now);
-                            osc1.stop(now + 1.2);
-
-                            // Nota 2 (Armónico agudo G5)
-                            const osc2 = audioCtx.createOscillator();
-                            const gain2 = audioCtx.createGain();
-                            osc2.type = 'sine';
-                            osc2.frequency.setValueAtTime(783.99, now + 0.12);
-                            gain2.gain.setValueAtTime(0.6, now + 0.12);
-                            gain2.gain.exponentialRampToValueAtTime(0.0001, now + 1.8);
-                            osc2.connect(gain2);
-                            gain2.connect(audioCtx.destination);
-                            osc2.start(now + 0.12);
-                            osc2.stop(now + 1.8);
-                        }
-
-                        if (audioCtx.state === 'suspended') {
-                            audioCtx.resume().then(() => playBell()).catch(() => playBell());
-                        } else {
-                            playBell();
-                        }
-                    } catch(e) {
-                        console.error("Error reproduciendo audio:", e);
-                    }
-                })();
-                </script>
-                """,
-                height=0,
-                width=0,
-            )
+    df_main, df_bitacora, info_estado = cargar_datos_gsheets()
 
     cols_deseadas = [
         "Fecha",
@@ -743,7 +673,7 @@ def render_tablero_fluido():
 
         if tiempo_transcurrido >= duracion_total and total_paginas > 1:
             st.session_state.page_index = (st.session_state.page_index + 1) % total_paginas
-            st.session_state.last_switch_time = me
+            st.session_state.last_switch_time = ahora
             st.session_state.manual_nav_bonus = 0
             st.rerun()
 
