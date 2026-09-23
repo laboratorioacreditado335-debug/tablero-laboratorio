@@ -119,11 +119,49 @@ if "search_term" not in st.session_state:
     st.session_state.search_term = ""
 if "manual_nav_bonus" not in st.session_state:
     st.session_state.manual_nav_bonus = 0
+if "last_alarm_id" not in st.session_state:
+    st.session_state.last_alarm_id = None
 
 
 # ---------------------------------------------------------
 # FUNCIONES AUXILIARES Y PARSER DE DATOS
 # ---------------------------------------------------------
+def emitir_sonido_alarma():
+    """Sintetiza un sonido de chime suave y agradable de 3 tonos vía Web Audio API."""
+    st.markdown(
+        """
+        <iframe srcdoc="
+            <script>
+                try {
+                    const AudioContext = window.AudioContext || window.webkitAudioContext;
+                    if (AudioContext) {
+                        const ctx = new AudioContext();
+                        function playChime() {
+                            const now = ctx.currentTime;
+                            const freqs = [523.25, 659.25, 783.99]; // Acorde armónico C5, E5, G5
+                            freqs.forEach((freq, idx) => {
+                                const osc = ctx.createOscillator();
+                                const gain = ctx.createGain();
+                                osc.type = 'sine';
+                                osc.frequency.setValueAtTime(freq, now + idx * 0.15);
+                                gain.gain.setValueAtTime(0.25, now + idx * 0.15);
+                                gain.gain.exponentialRampToValueAtTime(0.0001, now + idx * 0.15 + 1.0);
+                                osc.connect(gain);
+                                gain.connect(ctx.destination);
+                                osc.start(now + idx * 0.15);
+                                osc.stop(now + idx * 0.15 + 1.0);
+                            });
+                        }
+                        playChime();
+                    }
+                } catch(e) {}
+            </script>
+        " style="display:none; width:0; height:0; border:none;"></iframe>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
 def limpiar_texto(val):
     if pd.isna(val) or val is None:
         return ""
@@ -238,6 +276,8 @@ def cargar_datos_gsheets():
         df_proceso_raw = leer_hoja_google("C. Proceso órdenes", header_none=True)
         df_notas_raw = leer_hoja_google("NOTAS DEL DIA")
 
+        val_alarma = ""
+
         df_proceso = pd.DataFrame()
 
         if df_proceso_raw is not None and not df_proceso_raw.empty:
@@ -261,6 +301,15 @@ def cargar_datos_gsheets():
 
         df_notas = pd.DataFrame()
         if df_notas_raw is not None and not df_notas_raw.empty:
+            # Detección de celda o columna ALARMA
+            for col in df_notas_raw.columns:
+                if "ALARMA" in str(col).upper():
+                    vals = df_notas_raw[col].dropna().astype(str).str.strip()
+                    vals = vals[vals != ""]
+                    if not vals.empty:
+                        val_alarma = vals.iloc[0]
+                    break
+
             header_n_idx = None
             for idx, row in df_notas_raw.iterrows():
                 row_str = " ".join(row.dropna().astype(str)).upper()
@@ -282,10 +331,10 @@ def cargar_datos_gsheets():
             df_notas.columns = [str(col).strip() for col in df_notas.columns]
             df_notas = df_notas.replace("", np.nan).dropna(how="all")
 
-        return df_proceso, df_notas, "Conectado correctamente"
+        return df_proceso, df_notas, "Conectado correctamente", val_alarma
 
     except Exception as e:
-        return None, None, f"Error al conectar con Google Sheets: {str(e)}"
+        return None, None, f"Error al conectar con Google Sheets: {str(e)}", ""
 
 
 def render_dark_table(df_page):
@@ -437,7 +486,16 @@ def render_bitacora_card(prioridad_val, descripcion_val, estado_val):
 # ---------------------------------------------------------
 @st.fragment(run_every=5)
 def render_tablero_fluido():
-    df_main, df_bitacora, info_estado = cargar_datos_gsheets()
+    df_main, df_bitacora, info_estado, val_alarma = cargar_datos_gsheets()
+
+    # DETECCIÓN DE BOTÓN DE ALARMA DESDE GOOGLE SHEETS
+    if val_alarma and str(val_alarma).strip() != "":
+        val_alarma_str = str(val_alarma).strip()
+        if st.session_state.last_alarm_id is None:
+            st.session_state.last_alarm_id = val_alarma_str
+        elif st.session_state.last_alarm_id != val_alarma_str:
+            st.session_state.last_alarm_id = val_alarma_str
+            emitir_sonido_alarma()
 
     cols_deseadas = [
         "Fecha",
