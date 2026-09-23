@@ -39,16 +39,25 @@ st.markdown(
     }
     .kpi-value { color: #FFFFFF; font-size: 24px; font-weight: 800; }
 
-    /* COMPACTACIÓN DE TARJETAS DE ÓRDENES Y SECCIÓN INFERIOR */
+    /* TARJETAS DE ÓRDENES Y SECCIÓN INFERIOR SIN SCROLLBAR */
     .order-card {
         background-color: #1E293B;
         border-left: 4px solid #3B82F6;
         border-radius: 6px;
         padding: 6px 12px;
-        margin-bottom: 5px;
+        margin-bottom: 6px;
         font-weight: 600;
         color: #F8FAFC;
         font-size: 13px;
+    }
+
+    /* TARJETA DE PROGRESO DE ETAPA POR ÓRDEN */
+    .progress-order-card {
+        background-color: #111827;
+        border: 1px solid #1F2937;
+        border-radius: 6px;
+        padding: 6px 10px;
+        margin-bottom: 6px;
     }
 
     div.stButton > button {
@@ -178,6 +187,43 @@ def parsear_fecha(val):
         pass
 
     return None
+
+
+def calcular_progreso_orden(row):
+    """
+    Calcula el porcentaje de avance por etapas de una orden individual hacia CRM Salida:
+    1. Registrada = 20%
+    2. Aprobación Comercial = +20% (40%)
+    3. Certificado Firmado = +20% (60%)
+    4. CRM Certificado = +20% (80%)
+    5. CRM Salida / Enviado = +20% (100%)
+    """
+    progreso = 20  # Base por estar registrada
+
+    aprob = str(row.get("Aprob. Comercial", "")).strip().upper()
+    cer = str(row.get("Cer firmado", "")).strip().upper()
+    crm_cert = str(row.get("CRM cert.", "")).strip().upper()
+    crm_sal = str(row.get("CRM salida", "")).strip().upper()
+    env = str(row.get("Enviado", "")).strip().upper()
+
+    if aprob in ["SI", "SÍ", "APROBADO", "OK"] or (
+        aprob and aprob not in ["NO", "PENDIENTE", "NAN", "NONE", ""]
+    ):
+        progreso += 20
+
+    if cer in ["SI", "SÍ"]:
+        progreso += 20
+
+    if crm_cert and crm_cert not in ["", "NAN", "NONE", "PENDIENTE", "NO"]:
+        progreso += 20
+
+    if (crm_sal and crm_sal not in ["", "NAN", "NONE", "PENDIENTE", "NO"]) or env in [
+        "SI",
+        "SÍ",
+    ]:
+        progreso += 20
+
+    return min(100, progreso)
 
 
 def cargar_datos_gsheets():
@@ -356,7 +402,7 @@ def render_bitacora_card(prioridad_val, descripcion_val, estado_val):
         {"bg": "rgba(107, 114, 128, 0.2)", "text": "#E5E7EB", "border": "#9CA3AF"},
     )
 
-    return f'<div style="background: #111827; border-left: 4px solid {border_color}; border-radius: 6px; padding: 8px 12px; margin-bottom: 5px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3); display: flex; justify-content: space-between; align-items: center; gap: 10px;"><div style="color: #F3F4F6; font-size: 12.5px; font-weight: 500; line-height: 1.3; flex-grow: 1;">{descripcion}</div><div style="background-color: {s_style["bg"]}; color: {s_style["text"]}; border: 1px solid {s_style["border"]}; font-size: 10.5px; font-weight: 700; padding: 3px 8px; border-radius: 10px; letter-spacing: 0.5px; white-space: nowrap;">{estado}</div></div>'
+    return f'<div style="background: #111827; border-left: 4px solid {border_color}; border-radius: 6px; padding: 8px 12px; margin-bottom: 6px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3); display: flex; justify-content: space-between; align-items: center; gap: 10px;"><div style="color: #F3F4F6; font-size: 12.5px; font-weight: 500; line-height: 1.3; flex-grow: 1;">{descripcion}</div><div style="background-color: {s_style["bg"]}; color: {s_style["text"]}; border: 1px solid {s_style["border"]}; font-size: 10.5px; font-weight: 700; padding: 3px 8px; border-radius: 10px; letter-spacing: 0.5px; white-space: nowrap;">{estado}</div></div>'
 
 
 # ---------------------------------------------------------
@@ -376,11 +422,10 @@ def render_tablero_fluido():
         "CRM cert.",
     ]
     df_vista = pd.DataFrame()
+    df_hoy = pd.DataFrame()
 
     ordenes_hoy = []
     total_hoy = 0
-    cumplidos_hoy = 0
-    porcentaje_hoy = 0
 
     hoy_dt = datetime.now().date()
     fecha_activa_str = hoy_dt.strftime("%d/%m/%Y")
@@ -478,7 +523,7 @@ def render_tablero_fluido():
         if "Fecha_Raw" in df_vista.columns:
             df_vista["Fecha_dt"] = df_vista["Fecha_Raw"].apply(parsear_fecha)
 
-            # Asignación visual de la columna 'Fecha' (Sin celdas vacías)
+            # Formato de visualización de fecha
             def formatear_fecha_mostrar(row):
                 dt = row["Fecha_dt"]
                 if pd.notna(dt) and dt is not None:
@@ -510,13 +555,12 @@ def render_tablero_fluido():
                 )
             total_pend = max(0, total_reg - total_env)
 
-            # OBTENER DINÁMICAMENTE LAS ÓRDENES DE HOY DESDE EL EXCEL
-            df_hoy = df_vista[df_vista["Fecha_dt"] == hoy_dt]
+            # OBTENER ÓRDENES DE HOY DESDE EXCEL (O ÚLTIMA FECHA DISPONIBLE)
+            df_hoy = df_vista[df_vista["Fecha_dt"] == hoy_dt].copy()
 
-            # Respaldo en caso de desfase de fecha de servidor: usar el último día presente en el Excel
             if df_hoy.empty and not df_vista["Fecha_dt"].dropna().empty:
                 max_dt = df_vista["Fecha_dt"].dropna().max()
-                df_hoy = df_vista[df_vista["Fecha_dt"] == max_dt]
+                df_hoy = df_vista[df_vista["Fecha_dt"] == max_dt].copy()
                 fecha_activa_str = max_dt.strftime("%d/%m/%Y")
             else:
                 fecha_activa_str = hoy_dt.strftime("%d/%m/%Y")
@@ -525,16 +569,7 @@ def render_tablero_fluido():
             ordenes_hoy = list(dict.fromkeys(ordenes_raw))
             total_hoy = len(ordenes_hoy)
 
-            if total_hoy > 0:
-                for _, row in df_hoy.iterrows():
-                    env_v = str(row.get("Enviado", "")).strip().upper()
-                    cer_v = str(row.get("Cer firmado", "")).strip().upper()
-                    if env_v in ["SI", "SÍ"] or cer_v in ["SI", "SÍ"]:
-                        cumplidos_hoy += 1
-
-                porcentaje_hoy = int((cumplidos_hoy / total_hoy) * 100)
-
-            # Ordenar por fecha descendente (lo más reciente arriba, en la Página 1)
+            # Ordenar por fecha descendente
             df_vista = df_vista.sort_values(
                 by=["Fecha_dt", col_ord_main], ascending=[False, True]
             ).reset_index(drop=True)
@@ -573,7 +608,7 @@ def render_tablero_fluido():
 
     st.markdown("<div style='margin-bottom: 6px;'></div>", unsafe_allow_html=True)
 
-    # 2. TABLA PRINCIPAL CON NAVEGACIÓN Y BUSCADOR INTEGRADO
+    # 2. TABLA PRINCIPAL CON NAVEGACIÓN Y BUSCADOR
     if df_vista is not None and not df_vista.empty:
         col_btn1, col_btn2, col_search, col_info = st.columns([1.1, 1.1, 1.8, 2.5])
 
@@ -599,7 +634,7 @@ def render_tablero_fluido():
             )
             st.session_state.search_term = search_val
 
-        # APLICAR FILTRADO POR BÚSQUEDA SI EXISTE TEXTO
+        # FILTRADO POR BÚSQUEDA
         if st.session_state.search_term.strip():
             term = st.session_state.search_term.strip().lower()
             col_target = "# Orden" if "# Orden" in df_vista.columns else df_vista.columns[0]
@@ -607,7 +642,7 @@ def render_tablero_fluido():
                 df_vista[col_target].astype(str).str.lower().str.contains(term, na=False)
             ]
 
-        # MODIFICACIÓN A 10 ÓRDENES POR PÁGINA
+        # PAGINACIÓN DE 10 ÓRDENES POR PÁGINA
         filas_por_pagina = 10
         total_filas = len(df_vista)
         total_paginas = max(1, (total_filas + filas_por_pagina - 1) // filas_por_pagina)
@@ -646,69 +681,82 @@ def render_tablero_fluido():
         unsafe_allow_html=True,
     )
 
-    # 3. SECCIÓN INFERIOR
-    c_left, c_middle, c_right = st.columns([1, 1, 1.2])
+    # 3. SECCIÓN INFERIOR (SIN BARRAS DE DESPLAZAMIENTO INTEGRANDO ESPACIO LIBRE)
+    c_left, c_middle, c_right = st.columns([1, 1.2, 1.2])
 
     with c_left:
         st.markdown("<h4 style='margin:0 0 2px 0; font-size:14px; color:#F3F4F6;'>🚚 Programadas p/ Hoy</h4>", unsafe_allow_html=True)
-        st.caption(
-            f"🗓️ Fecha: **{fecha_activa_str}** | {total_hoy} agendadas"
-        )
+        st.caption(f"🗓️ Fecha: **{fecha_activa_str}** | {total_hoy} agendadas")
+        
         if ordenes_hoy:
-            html_list = (
-                '<div style="max-height: 160px; overflow-y: auto; padding-right: 4px;">'
-            )
+            html_list = '<div style="display: flex; flex-direction: column; gap: 4px;">'
             for ord_num in ordenes_hoy:
                 html_list += f'<div class="order-card">📦 Orden #: {ord_num}</div>'
             html_list += "</div>"
             st.markdown(html_list, unsafe_allow_html=True)
         else:
-            st.info(f"Sin órdenes hoy ({fecha_activa_str}).")
+            st.info(f"Sin órdenes programadas hoy ({fecha_activa_str}).")
 
     with c_middle:
-        st.markdown("<h4 style='margin:0 0 2px 0; font-size:14px; color:#F3F4F6;'>🎯 Meta del Día</h4>", unsafe_allow_html=True)
+        st.markdown("<h4 style='margin:0 0 2px 0; font-size:14px; color:#F3F4F6;'>📈 Progreso por Etapas (CRM Salida)</h4>", unsafe_allow_html=True)
+        
+        progresos = []
+        if df_hoy is not None and not df_hoy.empty:
+            for _, r in df_hoy.iterrows():
+                progresos.append((limpiar_texto(r.get('# Orden', '')), calcular_progreso_orden(r)))
+
+        acumulado_general = int(np.mean([p[1] for p in progresos])) if progresos else 0
+        st.caption(f"📊 Acumulado del Día: **{acumulado_general}%**")
+
+        # Barra de Acumulado General del Día
         st.markdown(
             f"""
-            <div style="background-color: #111827; border: 1px solid #1F2937; border-radius: 6px; padding: 10px 14px; margin-top: 14px; display: flex; justify-content: space-between; align-items: center;">
-                <span style="font-size: 11px; font-weight: 700; color: #9CA3AF; letter-spacing: 0.5px;">DESPACHOS CUMPLIDOS</span>
-                <span style="font-size: 15px; font-weight: 800; color: #60A5FA;">{cumplidos_hoy} de {total_hoy} ({porcentaje_hoy}%)</span>
+            <div style="background-color: #111827; border: 1px solid #1F2937; border-radius: 6px; padding: 10px 12px; margin-bottom: 8px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                    <span style="font-size: 11px; font-weight: 700; color: #9CA3AF; letter-spacing: 0.5px;">PROMEDIO GENERAL DEL DÍA</span>
+                    <span style="font-size: 16px; font-weight: 800; color: #38BDF8;">{acumulado_general}%</span>
+                </div>
+                <div style="background-color: #1F2937; border-radius: 10px; height: 10px; width: 100%; overflow: hidden;">
+                    <div style="background: linear-gradient(90deg, #3B82F6, #10B981); height: 100%; width: {acumulado_general}%; border-radius: 10px; transition: width 0.5s ease-in-out;"></div>
+                </div>
             </div>
             """,
             unsafe_allow_html=True,
         )
 
+        # Listado de avance individual por orden
+        if progresos:
+            html_progresos = '<div style="display: flex; flex-direction: column; gap: 4px;">'
+            for ord_num, pct in progresos:
+                bar_color = "#10B981" if pct == 100 else ("#3B82F6" if pct >= 60 else "#F59E0B")
+                html_progresos += f"""
+                <div class="progress-order-card">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                        <span style="font-size: 12px; font-weight: 700; color: #F3F4F6;">Orden #{ord_num}</span>
+                        <span style="font-size: 11.5px; font-weight: 800; color: {bar_color};">{pct}%</span>
+                    </div>
+                    <div style="background-color: #1F2937; border-radius: 6px; height: 6px; width: 100%; overflow: hidden;">
+                        <div style="background-color: {bar_color}; height: 100%; width: {pct}%;"></div>
+                    </div>
+                </div>
+                """
+            html_progresos += '</div>'
+            st.markdown(html_progresos, unsafe_allow_html=True)
+        else:
+            st.info("Sin registros de progreso hoy.")
+
     with c_right:
         st.markdown("<h4 style='margin:0 0 2px 0; font-size:14px; color:#F3F4F6;'>📌 Bitácora / Avisos del Día</h4>", unsafe_allow_html=True)
+        st.caption("Avisos y notas registradas en tiempo real")
+        
         if df_bitacora is None or df_bitacora.empty:
-            st.info(
-                "Sin avisos en 'NOTAS DEL DIA'."
-            )
+            st.info("Sin avisos en 'NOTAS DEL DIA'.")
         else:
-            col_p = next(
-                (
-                    c
-                    for c in df_bitacora.columns
-                    if "TIPO" in str(c).upper() or "PRIORIDAD" in str(c).upper()
-                ),
-                None,
-            )
-            col_d = next(
-                (
-                    c
-                    for c in df_bitacora.columns
-                    if "DESCRIP" in str(c).upper()
-                    or "NOTA" in str(c).upper()
-                    or "AVISO" in str(c).upper()
-                ),
-                None,
-            )
-            col_e = next(
-                (c for c in df_bitacora.columns if "ESTADO" in str(c).upper()), None
-            )
+            col_p = next((c for c in df_bitacora.columns if "TIPO" in str(c).upper() or "PRIORIDAD" in str(c).upper()), None)
+            col_d = next((c for c in df_bitacora.columns if "DESCRIP" in str(c).upper() or "NOTA" in str(c).upper() or "AVISO" in str(c).upper()), None)
+            col_e = next((c for c in df_bitacora.columns if "ESTADO" in str(c).upper()), None)
 
-            avisos_html = (
-                '<div style="max-height: 160px; overflow-y: auto; padding-right: 4px;">'
-            )
+            avisos_html = '<div style="display: flex; flex-direction: column; gap: 4px;">'
             avisos_cont = 0
             for _, row in df_bitacora.iterrows():
                 p_val = row[col_p] if col_p else "NORMAL"
