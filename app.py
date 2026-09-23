@@ -14,7 +14,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# Estilos CSS inyectados (Respetando paleta #0B1120 y tarjetas #111827)
+# Estilos CSS inyectados (Fondo #0B1120 y tarjetas #111827)
 st.markdown("""
 <style>
     /* Estilos Generales y Fondo */
@@ -24,7 +24,7 @@ st.markdown("""
         font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
     }
     
-    /* Ocultar elementos de Streamlit por defecto */
+    /* Ocultar elementos predeterminados de Streamlit */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     header {visibility: hidden;}
@@ -55,7 +55,7 @@ st.markdown("""
     .kpi-enviadas { color: #8B5CF6; }
     .kpi-pendientes { color: #F59E0B; }
 
-    /* Badges Condicionales */
+    /* Badges Condicionales Animados */
     .badge {
         padding: 4px 8px;
         border-radius: 4px;
@@ -162,11 +162,11 @@ def cargar_datos_gsheets():
         if df_ordenes is None or df_ordenes.empty:
             return pd.DataFrame(), df_notas
 
-        # Resolviendo celdas combinadas en columna Fecha
+        # Resolución de celdas combinadas en columna Fecha
         if 'Fecha' in df_ordenes.columns:
             df_ordenes['Fecha'] = df_ordenes['Fecha'].ffill()
 
-        # Limpieza del número de orden (eliminar sufijo .0 si existe)
+        # Limpieza del número de orden (eliminar sufijo .0)
         if 'Orden' in df_ordenes.columns:
             df_ordenes['Orden'] = df_ordenes['Orden'].astype(str).str.replace(r'\.0$', '', regex=True).str.strip()
 
@@ -177,10 +177,10 @@ def cargar_datos_gsheets():
         return pd.DataFrame(), pd.DataFrame()
 
 # -----------------------------------------------------------------------------
-# 3. FUNCIONES DE RENDERIZADO COMPONENTES HTML
+# 3. FUNCIONES DE RENDERIZADO DE COMPONENTES HTML
 # -----------------------------------------------------------------------------
 def render_kpis(df):
-    """Muestra las 4 tarjetas KPI principales."""
+    """Renderiza las 4 tarjetas KPI principales."""
     col1, col2, col3, col4 = st.columns(4)
     
     total_registradas = len(df) if not df.empty else 0
@@ -235,13 +235,14 @@ def render_dark_table(df_page):
         estado = row.get('Estado', '-')
         alerta = row.get('Alerta', '-')
 
-        # Render de Badges
+        # Asignación de badges según la alerta
         badge_html = ""
-        if str(alerta).lower() == 'atascada':
+        alerta_str = str(alerta).lower()
+        if 'atascada' in alerta_str:
             badge_html = '<span class="badge badge-atascada">Atascada</span>'
-        elif str(alerta).lower() == 'aprobación':
+        elif 'aprobación' in alerta_str or 'aprobacion' in alerta_str:
             badge_html = '<span class="badge badge-aprobacion">Aprobación</span>'
-        elif str(alerta).lower() == 'corrección':
+        elif 'corrección' in alerta_str or 'correccion' in alerta_str:
             badge_html = '<span class="badge badge-correccion">Corrección</span>'
         else:
             badge_html = f'<span>{alerta if pd.notna(alerta) else "-"}</span>'
@@ -260,7 +261,7 @@ def render_dark_table(df_page):
     st.markdown(html_code, unsafe_allow_html=True)
 
 def render_progreso_dia_card(orden_num, porcentaje):
-    """Renderiza cada tarjeta individual de progreso del día."""
+    """Renderiza tarjetas individuales de progreso garantizando la inyección HTML."""
     card_html = f'''
     <div class="progress-order-card">
         <div style="display: flex; justify-content: space-between; align-items: center;">
@@ -275,11 +276,12 @@ def render_progreso_dia_card(orden_num, porcentaje):
     st.markdown(card_html, unsafe_allow_html=True)
 
 def render_bitacora_card(nota_text, prioridad="Normal"):
-    """Renderiza tarjetas de avisos/bitácora."""
+    """Renderiza tarjetas de avisos de bitácora."""
     border_color = "#3B82F6"
-    if str(prioridad).lower() == "alta":
+    prio_str = str(prioridad).lower()
+    if prio_str == "alta":
         border_color = "#EF4444"
-    elif str(prioridad).lower() == "media":
+    elif prio_str == "media":
         border_color = "#F59E0B"
 
     bitacora_html = f'''
@@ -300,7 +302,7 @@ def render_tablero_fluido():
     # Cargar datos actualizados
     df_ordenes, df_notas = cargar_datos_gsheets()
     
-    # Mantenimiento de Paginación en session_state
+    # Control de paginación mediante session_state
     if 'pagina_actual' not in st.session_state:
         st.session_state.pagina_actual = 0
     if 'last_rotation' not in st.session_state:
