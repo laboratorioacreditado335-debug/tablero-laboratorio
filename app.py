@@ -100,7 +100,7 @@ if "last_switch_time" not in st.session_state:
 
 
 # ---------------------------------------------------------
-# FUNCIONES AUXILIARES Y LECTURA
+# FUNCIONES AUXILIARES Y LECTURA INSTANTÁNEA
 # ---------------------------------------------------------
 def limpiar_numero(val):
   if pd.isna(val) or val is None:
@@ -160,80 +160,14 @@ def parsear_fecha(val):
   return None
 
 
-def extraer_ordenes_calendario(df_raw, dia_hoy):
-  """Escanea dinámicamente el calendario multi-columna de Excel para el día de hoy."""
-  ordenes = []
-  if df_raw is None or df_raw.empty:
-    return ordenes
-
-  target_str = str(dia_hoy).strip()
-
-  for r_idx in range(len(df_raw)):
-    row_vals = df_raw.iloc[r_idx].values
-    for c_idx in range(len(row_vals)):
-      val_cell = str(row_vals[c_idx]).strip()
-      if val_cell.endswith(".0"):
-        val_cell = val_cell[:-2]
-
-      if val_cell == target_str:
-        # Detectar todas las subcolumnas asociadas a este día (ej. día 23 abarca 2 columnas)
-        cols_del_dia = [c_idx]
-        for c_next in range(c_idx + 1, len(row_vals)):
-          val_next = str(row_vals[c_next]).strip()
-          if val_next.endswith(".0"):
-            val_next = val_next[:-2]
-          if val_next.isdigit() and val_next != target_str:
-            break
-          cols_del_dia.append(c_next)
-          if len(cols_del_dia) >= 2:
-            break
-
-        # Leer verticalmente las órdenes en las subcolumnas detectadas
-        for sub_r in range(r_idx + 1, min(r_idx + 25, len(df_raw))):
-          row_sub = df_raw.iloc[sub_r]
-
-          cell_chk = str(row_sub.iloc[c_idx]).strip()
-          if cell_chk.endswith(".0"):
-            cell_chk = cell_chk[:-2]
-          if (
-              cell_chk.isdigit()
-              and cell_chk != target_str
-              and 1 <= int(cell_chk) <= 31
-          ):
-            break
-
-          for c_col in cols_del_dia:
-            cell_ord = str(row_sub.iloc[c_col]).strip()
-            cell_ord_clean = limpiar_numero(cell_ord)
-
-            if (
-                cell_ord_clean
-                and cell_ord_clean.lower()
-                not in ["nan", "none", "null", "nat"]
-                and not cell_ord_clean.startswith("#")
-                and not cell_ord_clean.startswith("=")
-            ):
-              if cell_ord_clean not in ordenes:
-                ordenes.append(cell_ord_clean)
-
-  return ordenes
-
-
 def cargar_datos_gsheets():
   try:
     df_proceso_raw = leer_hoja_google("C. Proceso órdenes", header_none=True)
     df_notas_raw = leer_hoja_google("NOTAS DEL DIA")
 
     df_proceso = pd.DataFrame()
-    ordenes_calendario = []
-    hoy_dt = datetime.now().date()
-    dia_actual = hoy_dt.day
 
     if df_proceso_raw is not None and not df_proceso_raw.empty:
-      ordenes_calendario = extraer_ordenes_calendario(
-          df_proceso_raw, dia_actual
-      )
-
       header_idx = None
       for idx, row in df_proceso_raw.iterrows():
         row_str = " ".join(row.dropna().astype(str)).upper()
@@ -288,15 +222,10 @@ def cargar_datos_gsheets():
       df_notas.columns = [str(col).strip() for col in df_notas.columns]
       df_notas = df_notas.dropna(how="all")
 
-    return (
-        df_proceso,
-        df_notas,
-        ordenes_calendario,
-        "Conectado correctamente",
-    )
+    return df_proceso, df_notas, "Conectado correctamente"
 
   except Exception as e:
-    return None, None, [], f"Error al conectar con Google Sheets: {str(e)}"
+    return None, None, f"Error al conectar con Google Sheets: {str(e)}"
 
 
 def render_dark_table(df_page):
@@ -428,7 +357,7 @@ def render_bitacora_card(prioridad_val, descripcion_val, estado_val):
 # ---------------------------------------------------------
 @st.fragment(run_every=5)
 def render_tablero_fluido():
-  df_main, df_bitacora, ordenes_cal, info_estado = cargar_datos_gsheets()
+  df_main, df_bitacora, info_estado = cargar_datos_gsheets()
 
   cols_deseadas = [
       "Fecha",
@@ -526,30 +455,7 @@ def render_tablero_fluido():
     if "Fecha" in df_vista.columns:
       df_vista["Fecha_dt"] = df_vista["Fecha"].apply(parsear_fecha)
 
-      # Unificar órdenes del calendario de hoy
-      ordenes_hoy = list(dict.fromkeys(ordenes_cal or []))
-
-      # Actualizar dinámicamente las órdenes del calendario para darles la fecha de HOY en la tabla principal
-      for ord_n in ordenes_hoy:
-        idx_match = df_vista[df_vista[col_ord_main] == ord_n].index
-        if len(idx_match) > 0:
-          df_vista.loc[idx_match, "Fecha_dt"] = hoy_dt
-        else:
-          # Si la orden programada no existe aún en la lista principal, crear fila sintética
-          nueva_fila = {
-              "Fecha": fecha_activa_str,
-              col_ord_main: ord_n,
-              "Cer firmado": "Pendiente",
-              "Enviado": "Pendiente",
-              "CRM salida": "Pendiente",
-              "Aprob. Comercial": "Pendiente",
-              "CRM cert.": "P. aprobación",
-              "Fecha_dt": hoy_dt,
-          }
-          df_vista = pd.concat(
-              [df_vista, pd.DataFrame([nueva_fila])], ignore_index=True
-          )
-
+      # Conteo Global
       total_reg = len(df_vista)
       if "Cer firmado" in df_vista.columns:
         total_firm = (
@@ -571,24 +477,29 @@ def render_tablero_fluido():
         )
       total_pend = max(0, total_reg - total_env)
 
-      total_hoy = len(ordenes_hoy)
+      # 🎯 OBTENER DINÁMICAMENTE LAS ÓRDENAS DE HOY DESDE LA TABLA PRINCIPAL
+      df_hoy = df_vista[df_vista["Fecha_dt"] == hoy_dt]
 
-      if total_hoy > 0 and not df_vista.empty:
-        for ord_n in ordenes_hoy:
-          match_row = df_vista[df_vista[col_ord_main] == ord_n]
-          if not match_row.empty:
-            if "Enviado" in match_row.columns and str(
-                match_row["Enviado"].values[0]
-            ).strip().upper() in ["SI", "SÍ"]:
-              cumplidos_hoy += 1
-            elif "Cer firmado" in match_row.columns and str(
-                match_row["Cer firmado"].values[0]
-            ).strip().upper() in ["SI", "SÍ"]:
-              cumplidos_hoy += 1
+      if not df_hoy.empty:
+        ordenes_raw = df_hoy[col_ord_main].dropna().tolist()
+        ordenes_hoy = [
+            o
+            for o in dict.fromkeys(ordenes_raw)
+            if o and str(o).lower() != "nan"
+        ]
+        total_hoy = len(ordenes_hoy)
 
-        porcentaje_hoy = int((cumplidos_hoy / total_hoy) * 100)
+        for _, row in df_hoy.iterrows():
+          env_v = str(row.get("Enviado", "")).strip().upper()
+          cer_v = str(row.get("Cer firmado", "")).strip().upper()
+          if env_v in ["SI", "SÍ"] or cer_v in ["SI", "SÍ"]:
+            cumplidos_hoy += 1
 
-      # Ordenar por fecha descendente para ver HOY en la Página 1 obligatoriamente
+        porcentaje_hoy = (
+            int((cumplidos_hoy / total_hoy) * 100) if total_hoy > 0 else 0
+        )
+
+      # Ordenar para mostrar siempre la fecha más reciente (hoy) primero
       df_vista = df_vista.sort_values(
           by=["Fecha_dt", col_ord_main], ascending=[False, True]
       ).reset_index(drop=True)
