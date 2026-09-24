@@ -3,7 +3,7 @@ import time
 import urllib.parse
 import numpy as np
 import pandas as pd
-import streamlit as st
+import streamlit as sts
 import streamlit.components.v1 as components
 
 # ---------------------------------------------------------
