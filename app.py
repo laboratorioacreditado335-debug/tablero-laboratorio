@@ -50,7 +50,7 @@ if "alert_filter" not in st.session_state:
 
 
 # ---------------------------------------------------------
-# ESTILOS MODO OSCURO
+# ESTILOS MODO OSCURO & INTEGRACIÓN DE COMPONENTES
 # ---------------------------------------------------------
 st.markdown(
     """
@@ -58,7 +58,7 @@ st.markdown(
     /* OCULTAR ENCABEZADOS Y AJUSTAR CONTENEDOR PRINCIPAL */
     header, [data-testid="stHeader"] { display: none !important; }
     .block-container { 
-        padding-top: 0.2rem !important; 
+        padding-top: 0.4rem !important; 
         padding-bottom: 0.2rem !important; 
         padding-left: 1rem !important;
         padding-right: 1rem !important;
@@ -66,6 +66,40 @@ st.markdown(
 
     .stApp { background-color: #0B1120; color: #F3F4F6; font-size: 14px; }
     
+    /* ENCABEZADO SUPERIOR */
+    .top-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 6px;
+        padding: 0 2px;
+    }
+    .top-title {
+        font-size: 14px;
+        font-weight: 800;
+        color: #F3F4F6;
+        letter-spacing: 0.5px;
+    }
+
+    /* BOTÓN AUDIO CÁPSULA PEQUEÑA */
+    button[key="btn_audio_top"] {
+        background-color: #1E293B !important;
+        color: #38BDF8 !important;
+        border: 1px solid #334155 !important;
+        border-radius: 12px !important;
+        font-size: 11px !important;
+        font-weight: 600 !important;
+        height: 24px !important;
+        padding: 0 10px !important;
+        width: auto !important;
+        box-shadow: none !important;
+    }
+    button[key="btn_audio_top"]:hover {
+        background-color: #0284C7 !important;
+        color: #FFFFFF !important;
+        border-color: #38BDF8 !important;
+    }
+
     /* TARJETAS KPI */
     .kpi-card {
         background-color: #111827;
@@ -115,18 +149,7 @@ st.markdown(
         box-shadow: 0 0 8px rgba(59, 130, 246, 0.5) !important;
     }
 
-    /* BOTÓN BORRAR BUSCADOR (X) */
-    button[key="btn_x_clear"] {
-        background-color: #374151 !important;
-        color: #EF4444 !important;
-        border: 1px solid #EF4444 !important;
-    }
-    button[key="btn_x_clear"]:hover {
-        background-color: #DC2626 !important;
-        color: #FFFFFF !important;
-    }
-
-    /* CAMPO DE BÚSQUEDA */
+    /* CAMPO DE BÚSQUEDA Y BOTÓN X INTEGRADO DENTRO */
     div[data-baseweb="input"] {
         background-color: #111827 !important;
         border: 1px solid #3B82F6 !important;
@@ -136,7 +159,34 @@ st.markdown(
     div[data-baseweb="input"] input {
         color: #F3F4F6 !important;
         font-size: 12.5px !important;
-        padding: 2px 8px !important;
+        padding: 2px 28px 2px 8px !important;
+    }
+
+    /* EFECTO X DENTRO DEL BUSCADOR */
+    div[data-testid="column"]:has(button[key="btn_x_clear"]) {
+        position: relative;
+        left: -34px;
+        top: 2px;
+        z-index: 10;
+        width: 0px !important;
+        min-width: 0px !important;
+    }
+    button[key="btn_x_clear"] {
+        background: transparent !important;
+        border: none !important;
+        color: #9CA3AF !important;
+        font-size: 11px !important;
+        font-weight: 800 !important;
+        padding: 0 !important;
+        height: 28px !important;
+        width: 22px !important;
+        min-width: 22px !important;
+        box-shadow: none !important;
+    }
+    button[key="btn_x_clear"]:hover {
+        color: #EF4444 !important;
+        background: transparent !important;
+        box-shadow: none !important;
     }
 
     /* ANIMACIÓN PARPADEO CORRECCIÓN */
@@ -497,13 +547,12 @@ def render_bitacora_card(prioridad_val, descripcion_val, estado_val, elapsed_sec
         secs = elapsed_sec % 60
         time_formatted = f"{mins:02d}:{secs:02d}"
         
-        # Inicia exactamente en 0% cuando es nueva y sube hasta 100% a los 10 minutos (600s)
         pct_bar = min(100, max(0, int((elapsed_sec / 600.0) * 100)))
         
-        if elapsed_sec < 300: # < 5 min
+        if elapsed_sec < 300:
             bar_color = "#10B981"
             txt_t = f"⏱️ Transcurrido: {time_formatted}"
-        elif elapsed_sec < 600: # < 10 min
+        elif elapsed_sec < 600:
             bar_color = "#F59E0B"
             txt_t = f"⏱️ Transcurrido: {time_formatted}"
         else:
@@ -526,7 +575,7 @@ def render_bitacora_card(prioridad_val, descripcion_val, estado_val, elapsed_sec
 
 
 # ---------------------------------------------------------
-# CALLBACKS PARA LIMPIEZA
+# CALLBACKS DE BORRADO
 # ---------------------------------------------------------
 def borrar_busqueda():
     st.session_state.search_input = ""
@@ -537,11 +586,18 @@ def borrar_busqueda():
 # ---------------------------------------------------------
 @st.fragment(run_every=5)
 def render_tablero_fluido():
+    # 0. ENCABEZADO CON BOTÓN DE AUDIO PEQUEÑO Y REUBICADO
+    col_h1, col_h2 = st.columns([0.85, 0.15])
+    with col_h1:
+        st.markdown('<div class="top-title">📊 TABLERO DE CONTROL - LABORATORIO</div>', unsafe_allow_html=True)
+    with col_h2:
+        if st.button("🔔 Audio", key="btn_audio_top", help="Haz clic para activar el sonido si es el inicio del día"):
+            reproducir_alarma_audio()
+
     df_main, df_bitacora, info_estado = cargar_datos_gsheets()
 
     activar_sonido_emergencia = False
     
-    # RASTREO Y CRONÓMETRO DE BITÁCORA CON CLAVES ÚNICAS
     urgent_elapsed_map = {}
     if df_bitacora is not None and not df_bitacora.empty:
         col_p = next(
@@ -557,7 +613,6 @@ def render_tablero_fluido():
                 prio_val = str(row[col_p]).strip().upper()
                 desc_val = str(row[col_d]).strip()
                 
-                # Clave única combinada por índice y descripción para evitar colisiones
                 note_key = f"{idx_b}_{desc_val}"
                 
                 if prio_val == "URGENTE" and desc_val:
@@ -574,13 +629,11 @@ def render_tablero_fluido():
 
                     sounded_set = ESTADO_GLOBAL["urgent_sounded_stages"].get(note_key, set())
 
-                    # Etapa 0: Primera aparición
                     if 0 not in sounded_set:
                         activar_sonido_emergencia = True
                         sounded_set.add(0)
                         ESTADO_GLOBAL["urgent_sounded_stages"][note_key] = sounded_set
 
-                    # Etapa 1: Supera los 10 minutos (>= 600s)
                     if elapsed >= 600 and 1 not in sounded_set:
                         activar_sonido_emergencia = True
                         sounded_set.add(1)
@@ -785,10 +838,10 @@ def render_tablero_fluido():
 
     st.markdown("<div style='margin-bottom: 2px;'></div>", unsafe_allow_html=True)
 
-    # 2. CONTROLES Y BUSCADOR CON LIMPIEZA NATIVA
+    # 2. CONTROLES Y BUSCADOR INTEGRADO
     if df_vista is not None and not df_vista.empty:
-        col_btn1, col_btn2, col_audio, col_f_todas, col_f_atasc, col_f_correc, col_search_in, col_search_x, col_info = st.columns(
-            [0.5, 0.5, 0.9, 0.8, 1.1, 1.1, 1.8, 0.3, 1.4]
+        col_btn1, col_btn2, col_f_todas, col_f_atasc, col_f_correc, col_search_in, col_search_x, col_info = st.columns(
+            [0.55, 0.55, 0.9, 1.2, 1.2, 2.0, 0.001, 1.6]
         )
 
         with col_btn1:
@@ -804,10 +857,6 @@ def render_tablero_fluido():
                 st.session_state.last_switch_time = time.time()
                 st.session_state.manual_nav_bonus = 30
                 st.rerun()
-
-        with col_audio:
-            if st.button("🔔 Activar Audio", help="Haz clic para dar permisos de sonido al navegador en tu turno"):
-                reproducir_alarma_audio()
 
         with col_f_todas:
             lbl_todas = "📋 Todas" if st.session_state.alert_filter != "TODAS" else "▶ 📋 Todas"
@@ -839,10 +888,10 @@ def render_tablero_fluido():
                 label_visibility="collapsed",
             )
 
-        # BOTÓN DE BORRADO "❌" (SOLO APARECE SI HAY TEXTO)
+        # BOTÓN '✕' DISCRETO APARANTE DENTRO DEL BUSCADOR
         with col_search_x:
             if st.session_state.get("search_input", "").strip():
-                st.button("❌", on_click=borrar_busqueda, key="btn_x_clear", help="Limpiar texto de búsqueda")
+                st.button("✕", on_click=borrar_busqueda, key="btn_x_clear", help="Limpiar búsqueda")
 
         col_cer_f = next((c for c in df_vista.columns if "CER" in c.upper()), None)
         col_crm_f = next((c for c in df_vista.columns if "CRM" in c.upper() and "SALIDA" in c.upper()), None)
@@ -857,7 +906,7 @@ def render_tablero_fluido():
                 df_vista[col_cer_f].astype(str).str.upper().str.contains("CORREC", na=False)
             ]
 
-        # FILTRADO DINÁMICO POR TEXTO DE BÚSQUEDA
+        # FILTRADO DINÁMICO
         term_search = st.session_state.get("search_input", "").strip().lower()
         if term_search:
             col_target = "# Orden" if "# Orden" in df_vista.columns else df_vista.columns[0]
@@ -896,11 +945,11 @@ def render_tablero_fluido():
 
         with col_info:
             segundos_restantes = max(0, int(duracion_total - tiempo_transcurrido))
-            bonus_str = " (+30s manual)" if st.session_state.get("manual_nav_bonus", 0) > 0 else ""
-            f_active = f" | Filtro: {st.session_state.alert_filter}" if st.session_state.alert_filter != "TODAS" else ""
+            bonus_str = " (+30s)" if st.session_state.get("manual_nav_bonus", 0) > 0 else ""
+            f_active = f" | {st.session_state.alert_filter}" if st.session_state.alert_filter != "TODAS" else ""
             st.caption(
                 f"Pág. {p_idx + 1}/{total_paginas} ({total_filas} reg.){f_active}"
-                f" | ⏱️ Rotación: {segundos_restantes}s{bonus_str}"
+                f" | ⏱️ {segundos_restantes}s{bonus_str}"
             )
 
         st.markdown(render_dark_table(df_pagina), unsafe_allow_html=True)
