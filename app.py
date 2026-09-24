@@ -126,7 +126,7 @@ if "search_term" not in st.session_state:
 if "manual_nav_bonus" not in st.session_state:
     st.session_state.manual_nav_bonus = 0
 if "known_urgents" not in st.session_state:
-    st.session_state.known_urgents = None  # Se inicializará con la primera carga
+    st.session_state.known_urgents = None
 if "last_search_time" not in st.session_state:
     st.session_state.last_search_time = time.time()
 if "last_search_val" not in st.session_state:
@@ -456,12 +456,10 @@ def render_tablero_fluido():
                 if prio_val == "URGENTE" and desc_val:
                     urgentes_actuales.add(desc_val)
 
-    # Lógica de detección de items URGENTE nuevos
     reproducir_sonido = False
     texto_alerta = ""
 
     if st.session_state.known_urgents is None:
-        # Primera carga: Memorizamos las existentes para no sonar al refrescar la pantalla inicial
         st.session_state.known_urgents = urgentes_actuales
     else:
         nuevos_urgentes = urgentes_actuales - st.session_state.known_urgents
@@ -470,46 +468,37 @@ def render_tablero_fluido():
             texto_alerta = " / ".join(list(nuevos_urgentes))
             st.session_state.known_urgents = urgentes_actuales
 
-    # DISPARADOR AUTOMÁTICO DE AUDIO
+    # DISPARADOR DE AUDIO SILENCIOSO E INVISIBLE (REPETICIÓN 4 PULSOS DE ALARMA)
     if reproducir_sonido:
         texto_clean = texto_alerta.replace("'", "\\'").replace("\n", " ")
         components.html(
             f"""
             <script>
             (function() {{
-                function sonarAlertaAuto() {{
+                function sonarAlertaRepetida() {{
                     try {{
                         var AudioContext = window.AudioContext || window.webkitAudioContext;
                         if (!AudioContext) return;
                         var ctx = new AudioContext();
-                        
-                        // Tono 1 (Urgent Pitch)
-                        var osc1 = ctx.createOscillator();
-                        var gain1 = ctx.createGain();
-                        osc1.type = 'sawtooth';
-                        osc1.frequency.setValueAtTime(880, ctx.currentTime);
-                        gain1.gain.setValueAtTime(0.3, ctx.currentTime);
-                        gain1.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
-                        osc1.connect(gain1);
-                        gain1.connect(ctx.destination);
-                        osc1.start(ctx.currentTime);
-                        osc1.stop(ctx.currentTime + 0.3);
+                        if (ctx.state === 'suspended') {{ ctx.resume(); }}
 
-                        // Tono 2
-                        var osc2 = ctx.createOscillator();
-                        var gain2 = ctx.createGain();
-                        osc2.type = 'sawtooth';
-                        osc2.frequency.setValueAtTime(1046.50, ctx.currentTime + 0.2);
-                        gain2.gain.setValueAtTime(0.4, ctx.currentTime + 0.2);
-                        gain2.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.6);
-                        osc2.connect(gain2);
-                        gain2.connect(ctx.destination);
-                        osc2.start(ctx.currentTime + 0.2);
-                        osc2.stop(ctx.currentTime + 0.6);
+                        var tiempos = [0, 0.25, 0.5, 0.75];
+                        tiempos.forEach(function(t) {{
+                            var osc = ctx.createOscillator();
+                            var gain = ctx.createGain();
+                            osc.type = 'sawtooth';
+                            osc.frequency.setValueAtTime(950, ctx.currentTime + t);
+                            gain.gain.setValueAtTime(0.4, ctx.currentTime + t);
+                            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + t + 0.18);
+                            osc.connect(gain);
+                            gain.connect(ctx.destination);
+                            osc.start(ctx.currentTime + t);
+                            osc.stop(ctx.currentTime + t + 0.18);
+                        }});
                     }} catch(e) {{ console.log(e); }}
                 }}
 
-                sonarAlertaAuto();
+                sonarAlertaRepetida();
 
                 if ("Notification" in window && Notification.permission === "granted") {{
                     new Notification("🚨 NOTA URGENTE EN BITÁCORA", {{
@@ -520,9 +509,28 @@ def render_tablero_fluido():
             }})();
             </script>
             """,
-            height=1,
-            width=1,
+            height=0,
+            width=0,
         )
+
+    # UNLOCKER DE AUDIO INVISIBLE GLOBAL (ACTIVACIÓN AUTOMÁTICA AL TOCAR LA PÁGINA)
+    components.html(
+        """
+        <script>
+        window.top.document.addEventListener('click', function() {
+            try {
+                var AudioContext = window.AudioContext || window.webkitAudioContext;
+                if (AudioContext) {
+                    var ctx = new AudioContext();
+                    ctx.resume();
+                }
+            } catch(e) {}
+        }, { once: true });
+        </script>
+        """,
+        height=0,
+        width=0,
+    )
 
     cols_deseadas = [
         "Fecha",
@@ -698,7 +706,7 @@ def render_tablero_fluido():
 
     # 2. TABLA PRINCIPAL CON CONTROLES Y BUSCADOR
     if df_vista is not None and not df_vista.empty:
-        col_btn1, col_btn2, col_search, col_perm, col_info = st.columns([0.8, 0.8, 1.6, 1.4, 2.0])
+        col_btn1, col_btn2, col_search, col_info = st.columns([0.8, 0.8, 2.0, 2.4])
 
         with col_btn1:
             if st.button("⬆️ Subir"):
@@ -736,33 +744,6 @@ def render_tablero_fluido():
                 st.session_state.last_search_val = search_val
                 st.session_state.last_search_time = time.time()
                 st.session_state.search_term = search_val
-
-        with col_perm:
-            # BOTÓN DE PRIMERA ACTIVACIÓN OBLIGATORIA POR NAVEGADOR
-            components.html(
-                """
-                <button onclick="desbloquearAudio()" style="background-color: #1E293B; color: #38BDF8; border: 1px solid #3B82F6; border-radius: 5px; padding: 2px 8px; font-size: 11px; font-weight: 700; width: 100%; height: 34px; cursor: pointer;">
-                    🔔 Activar Permiso de Audio
-                </button>
-                <script>
-                function desbloquearAudio() {
-                    try {
-                        var AudioContext = window.AudioContext || window.webkitAudioContext;
-                        if (AudioContext) {
-                            var ctx = new AudioContext();
-                            ctx.resume();
-                        }
-                    } catch(e) {}
-                    
-                    if ("Notification" in window) {
-                        Notification.requestPermission();
-                    }
-                    alert('✅ Audio habilitado. Las notas URGENTES sonar\u00e1n autom\u00e1ticamente sin dar clic.');
-                }
-                </script>
-                """,
-                height=38,
-            )
 
         if st.session_state.search_term.strip():
             term = st.session_state.search_term.strip().lower()
@@ -819,7 +800,7 @@ def render_tablero_fluido():
         unsafe_allow_html=True,
     )
 
-    # 3. SECCIÓN INFERIOR COMPACTA CON SCROLLBARS INTERNOS
+    # 3. SECCIÓN INFERIOR COMPACTA
     c_left, c_middle, c_right = st.columns([1.2, 1.1, 1.2])
 
     with c_left:
@@ -850,7 +831,8 @@ def render_tablero_fluido():
                 unsafe_allow_html=True,
             )
 
-            html_progresos = '<div style="display: flex; flex-direction: column; gap: 3px; max-height: 200px; overflow-y: auto; padding-right: 4px;">'
+            # MOSTRAR COMPLETO SIN CORTE NI SCROLLBAR
+            html_progresos = '<div style="display: flex; flex-direction: column; gap: 3px;">'
             for ord_num, pct in progresos:
                 bar_color = "#10B981" if pct == 100 else ("#3B82F6" if pct >= 50 else "#F59E0B")
                 html_progresos += (
