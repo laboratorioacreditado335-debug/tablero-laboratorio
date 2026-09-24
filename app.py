@@ -7,12 +7,12 @@ import streamlit as st
 import streamlit.components.v1 as components
 
 # ---------------------------------------------------------
-# ID DEL NUEVO GOOGLE SHEET
+# ID DEL GOOGLE SHEET
 # ---------------------------------------------------------
 SPREADSHEET_ID = "1CvPEtDspm7g3T7yXDluEUD7kGyWH5abNAP1nkalX6sI"
 
 # ---------------------------------------------------------
-# AUDIO EN BASE64 (CHIME DE NOTIFICACIÓN LOUD & CLEAN)
+# AUDIO EN BASE64 (CHIME DE NOTIFICACIÓN)
 # ---------------------------------------------------------
 AUDIO_BASE64 = (
     "UklGRmisAABXQVZFZm10IBAAAAABAAEAIlYAAESsAAACABAAZGF0YACsA"
@@ -437,26 +437,55 @@ def render_bitacora_card(prioridad_val, descripcion_val, estado_val):
 def render_tablero_fluido():
     df_main, df_bitacora, info_estado, alarm_val = cargar_datos_gsheets()
 
-    # CONTROL Y REPRODUCCIÓN DE ALARMA ROBUSTA (DISPARO EN TIEMPO REAL)
+    # ---------------------------------------------------------
+    # NOTIFICACIÓN NATIVA DEL NAVEGADOR + AUDIO CHIME
+    # ---------------------------------------------------------
     if alarm_val is not None:
         if st.session_state.last_alarm_id is None:
             st.session_state.last_alarm_id = alarm_val
         elif st.session_state.last_alarm_id != alarm_val:
             st.session_state.last_alarm_id = alarm_val
+            
+            texto_alerta = str(alarm_val).replace("'", "\\'").replace("\n", " ")
+            
             components.html(
                 f"""
-                <div style="display:none;">
-                    <audio autoplay>
-                        <source src="data:audio/wav;base64,{AUDIO_BASE64}" type="audio/wav">
-                    </audio>
-                </div>
                 <script>
-                    try {{
-                        var snd = new Audio("data:audio/wav;base64,{AUDIO_BASE64}");
-                        snd.play();
-                    }} catch(e) {{
-                        console.log("Autoplay diferido:", e);
+                (function() {{
+                    const audioBase64 = "{AUDIO_BASE64}";
+                    const msj = "{texto_alerta}";
+
+                    function dispararNotificacionYSonido() {{
+                        // 1. Notificación Nativa del Sistema Operativo / Navegador
+                        if ("Notification" in window && Notification.permission === "granted") {{
+                            new Notification("⚠️ Alerta de Laboratorio", {{
+                                body: msj,
+                                icon: "https://cdn-icons-png.flaticon.com/512/1827/1827349.png",
+                                silent: true
+                            }});
+                        }}
+
+                        // 2. Reproducción del Chime de Audio
+                        try {{
+                            var snd = new Audio("data:audio/wav;base64," + audioBase64);
+                            snd.play().catch(function(e) {{ console.log("Audio diferido:", e); }});
+                        }} catch(e) {{
+                            console.log("Error al reproducir audio:", e);
+                        }}
                     }}
+
+                    if ("Notification" in window) {{
+                        if (Notification.permission === "granted") {{
+                            dispararNotificacionYSonido();
+                        }} else if (Notification.permission !== "denied") {{
+                            Notification.requestPermission().then(function(permission) {{
+                                if (permission === "granted") {{
+                                    dispararNotificacionYSonido();
+                                }}
+                            }});
+                        }}
+                    }}
+                }})();
                 </script>
                 """,
                 height=1,
@@ -637,7 +666,7 @@ def render_tablero_fluido():
 
     # 2. TABLA PRINCIPAL CON CONTROLES Y BUSCADOR
     if df_vista is not None and not df_vista.empty:
-        col_btn1, col_btn2, col_search, col_info = st.columns([1, 1, 1.8, 2.5])
+        col_btn1, col_btn2, col_search, col_perm, col_info = st.columns([0.8, 0.8, 1.6, 1.4, 2.0])
 
         with col_btn1:
             if st.button("⬆️ Subir"):
@@ -675,6 +704,30 @@ def render_tablero_fluido():
                 st.session_state.last_search_val = search_val
                 st.session_state.last_search_time = time.time()
                 st.session_state.search_term = search_val
+
+        with col_perm:
+            # BOTÓN DE PERMISOS NATIVOS DEL NAVEGADOR
+            components.html(
+                """
+                <button onclick="solicitarPermiso()" style="background-color: #1E293B; color: #38BDF8; border: 1px solid #3B82F6; border-radius: 5px; padding: 2px 8px; font-size: 11.5px; font-weight: 700; width: 100%; height: 34px; cursor: pointer;">
+                    🔔 Habilitar Alertas
+                </button>
+                <script>
+                function solicitarPermiso() {
+                    if ("Notification" in window) {
+                        Notification.requestPermission().then(function(perm) {
+                            if(perm === 'granted') {
+                                alert('✅ Notificaciones activadas en este equipo.');
+                            } else {
+                                alert('⚠️ Permiso no otorgado. Habilítalo en el candado de la URL.');
+                            }
+                        });
+                    }
+                }
+                </script>
+                """,
+                height=38,
+            )
 
         if st.session_state.search_term.strip():
             term = st.session_state.search_term.strip().lower()
@@ -805,7 +858,6 @@ def render_tablero_fluido():
             col_d = next((c for c in df_bitacora.columns if "DESCRIP" in str(c).upper() or "NOTA" in str(c).upper() or "AVISO" in str(c).upper()), None)
             col_e = next((c for c in df_bitacora.columns if "ESTADO" in str(c).upper()), None)
 
-            # Ordenar bitácora por prioridad (URGENTE primero)
             if col_p and col_p in df_bitacora.columns:
                 prio_map = {
                     "URGENTE": 1,
