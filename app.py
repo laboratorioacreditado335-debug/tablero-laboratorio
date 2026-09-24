@@ -48,7 +48,7 @@ def obtener_estado_global():
 
 ESTADO_GLOBAL = obtener_estado_global()
 
-# ESTADOS DE SESIÓN LOCALES
+# ESTADOS DE SESIÓN LOCALES (CADA NAVEGADOR TIENE EL SUYO)
 if "page_index" not in st.session_state:
     st.session_state.page_index = 0
 if "last_switch_time" not in st.session_state:
@@ -66,6 +66,12 @@ if "prog_day_last_switch" not in st.session_state:
     st.session_state.prog_day_last_switch = time.time()
 if "alert_filter" not in st.session_state:
     st.session_state.alert_filter = "TODAS"
+
+# Control local de alarmas y notificaciones vistas por este navegador
+if "played_sound_cycles" not in st.session_state:
+    st.session_state.played_sound_cycles = set()
+if "known_msg_ids" not in st.session_state:
+    st.session_state.known_msg_ids = set()
 
 
 # ---------------------------------------------------------
@@ -338,7 +344,7 @@ st.markdown(
 )
 
 # ---------------------------------------------------------
-# REPRODUCTOR DE AUDIO ALARMA (OPTIMIZADO CON RESUME)
+# REPRODUCTOR DE AUDIO ALARMA DE ALTA PRIORIDAD
 # ---------------------------------------------------------
 def reproducir_alarma_audio():
     components.html(
@@ -356,29 +362,29 @@ def reproducir_alarma_audio():
                     }
                     
                     var now = ctx.currentTime;
-                    var freqs = [880, 1200, 880, 1200, 1500];
+                    var freqs = [900, 1400, 900, 1400, 1600];
                     
                     freqs.forEach(function(freq, i) {
-                        var t = now + (i * 0.14);
+                        var t = now + (i * 0.12);
                         var osc = ctx.createOscillator();
                         var gain = ctx.createGain();
                         
                         osc.type = 'sawtooth';
                         osc.frequency.setValueAtTime(freq, t);
                         
-                        gain.gain.setValueAtTime(0.4, t);
-                        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
+                        gain.gain.setValueAtTime(0.6, t);
+                        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.11);
                         
                         osc.connect(gain);
                         gain.connect(ctx.destination);
                         
                         osc.start(t);
-                        osc.stop(t + 0.13);
+                        osc.stop(t + 0.12);
                     });
-                } catch(e) { console.error("Error reproduciendo audio:", e); }
+                } catch(e) { console.error("Error al reproducir alarma:", e); }
             }
             sonar();
-            setTimeout(sonar, 250);
+            setTimeout(sonar, 220);
         })();
         </script>
         """,
@@ -728,8 +734,9 @@ def render_tablero_fluido():
             emisor_raw = str(r[col_em]).strip() if col_em and str(r[col_em]).strip() in LISTA_EMISORES else "Jeison Altamar"
             receptor_raw = str(r[col_rec]).strip() if col_rec and str(r[col_rec]).strip() in LISTA_RECEPTORES else "Todos"
 
+            m_id_gs = f"gs_{idx_b}_{int(now_ts)}"
             ESTADO_GLOBAL["mensajes_bitacora"].append({
-                "id": f"gs_{idx_b}_{int(now_ts)}",
+                "id": m_id_gs,
                 "emisor": emisor_raw,
                 "receptor": receptor_raw,
                 "prioridad": prio_clean,
@@ -738,19 +745,57 @@ def render_tablero_fluido():
                 "timestamp": now_ts,
                 "estado": est_clean,
                 "usuario_enterado": None,
-                "fecha_enterado": None,
-                "last_sound_cycle": 0 if prio_clean == "Urgente" else -1
+                "fecha_enterado": None
             })
+            st.session_state.known_msg_ids.add(m_id_gs)
+
         ESTADO_GLOBAL["cargado_gsheet"] = True
 
-    # EVALUACIÓN DE MENSAJES URGENTES PENDIENTES
+    # ---------------------------------------------------------
+    # SISTEMA MULTIDISPOSITIVO DE NOTIFICACIONES Y ALARMA
+    # ---------------------------------------------------------
+    now_curr = time.time()
+    
+    # 1. Notificación visual en pantalla (Toast) para CUALQUIER mensaje nuevo
+    for msg_n in reversed(ESTADO_GLOBAL["mensajes_bitacora"]):
+        m_id = msg_n.get("id")
+        if m_id and m_id not in st.session_state.known_msg_ids:
+            st.session_state.known_msg_ids.add(m_id)
+            prio = msg_n.get("prioridad", "Normal")
+            emisor = msg_n.get("emisor", "Usuario")
+            resumen = msg_n.get("contenido", "")[:50]
+            
+            if prio == "Urgente":
+                st.toast(f"🚨 URGENTE de {emisor}: {resumen}", icon="🚨")
+            elif prio == "Auditoría":
+                st.toast(f"🟡 AUDITORÍA de {emisor}: {resumen}", icon="🟡")
+            else:
+                st.toast(f"💬 NOVEDAD de {emisor}: {resumen}", icon="💬")
+
+    # 2. Reproducción de Sonido Exclusiva para Mensajes URGENTES en TODAS las PCs
+    debe_sonar = False
+    for msg_u in ESTADO_GLOBAL["mensajes_bitacora"]:
+        if msg_u.get("prioridad") == "Urgente" and msg_u.get("estado") == "Pendiente":
+            ts_start = msg_u.get("timestamp", now_curr)
+            elapsed = max(0, now_curr - ts_start)
+            c_num = int(elapsed // 240) # Nuevo ciclo cada 4 minutos (240 segundos)
+            m_id = msg_u.get("id")
+
+            sound_key = (m_id, c_num)
+            if sound_key not in st.session_state.played_sound_cycles:
+                st.session_state.played_sound_cycles.add(sound_key)
+                debe_sonar = True
+
+    if debe_sonar and st.session_state.sound_enabled:
+        reproducir_alarma_audio()
+
+    # BANNER FLOTANTE SUPERIOR SI HAY URGENCIAS PENDIENTES
     urgentes_pendientes = [
         m for m in ESTADO_GLOBAL["mensajes_bitacora"]
         if m.get("prioridad") == "Urgente" and m.get("estado") == "Pendiente"
     ]
     cant_urgencias_activas = len(urgentes_pendientes)
 
-    # BANNER FLOTANTE SUPERIOR SI HAY URGENCIAS PENDIENTES
     if cant_urgencias_activas > 0:
         st.markdown(
             f'''
@@ -949,12 +994,11 @@ def render_tablero_fluido():
                 st.session_state.manual_nav_bonus = 30
                 st.rerun()
 
-        # AL PRESIONAR BOTONES DE FILTRO SE BORRA EL BUSCADOR
         with col_f_todas:
             lbl_todas = "📋 Todas" if st.session_state.alert_filter != "TODAS" else "▶ 📋 Todas"
             if st.button(lbl_todas, key="btn_f_todas"):
                 st.session_state.alert_filter = "TODAS"
-                st.session_state.search_input = ""  # Limpia el buscador
+                st.session_state.search_input = ""
                 st.session_state.page_index = 0
                 st.rerun()
 
@@ -962,7 +1006,7 @@ def render_tablero_fluido():
             lbl_atasc = f"⚠️ Atascadas ({cant_atascadas})" if st.session_state.alert_filter != "ATASCADAS" else f"▶ ⚠️ Atascadas ({cant_atascadas})"
             if st.button(lbl_atasc, key="btn_f_atasc"):
                 st.session_state.alert_filter = "ATASCADAS"
-                st.session_state.search_input = ""  # Limpia el buscador
+                st.session_state.search_input = ""
                 st.session_state.page_index = 0
                 st.rerun()
 
@@ -970,7 +1014,7 @@ def render_tablero_fluido():
             lbl_correc = f"🚨 Corrección ({cant_correcciones})" if st.session_state.alert_filter != "CORRECCION" else f"▶ 🚨 Corrección ({cant_correcciones})"
             if st.button(lbl_correc, key="btn_f_correc"):
                 st.session_state.alert_filter = "CORRECCION"
-                st.session_state.search_input = ""  # Limpia el buscador
+                st.session_state.search_input = ""
                 st.session_state.page_index = 0
                 st.rerun()
 
@@ -1202,8 +1246,9 @@ def render_tablero_fluido():
             if st.button("📤 Publicar Novedad", key="btn_publicar_bitacora"):
                 if contenido_input.strip():
                     now_ts_new = time.time()
+                    m_id_new = f"msg_{int(now_ts_new * 1000)}"
                     nuevo_msg = {
-                        "id": f"msg_{int(now_ts_new * 1000)}",
+                        "id": m_id_new,
                         "emisor": emisor_sel,
                         "receptor": receptor_sel,
                         "prioridad": prio_clean,
@@ -1212,8 +1257,7 @@ def render_tablero_fluido():
                         "timestamp": now_ts_new,
                         "estado": "Pendiente",
                         "usuario_enterado": None,
-                        "fecha_enterado": None,
-                        "last_sound_cycle": -1  # Marca para que el renderizador dispare el audio
+                        "fecha_enterado": None
                     }
                     ESTADO_GLOBAL["mensajes_bitacora"].insert(0, nuevo_msg)
                     st.success("¡Novedad publicada correctamente!")
@@ -1221,7 +1265,7 @@ def render_tablero_fluido():
                 else:
                     st.warning("Escriba el contenido antes de enviar.")
 
-        # FEED TIPO CHAT DE NOVEDADES CON RE-ESCALAMIENTO Y DISPARO DE AUDIO
+        # FEED TIPO CHAT DE NOVEDADES
         st.markdown("<div class='chat-container'>", unsafe_allow_html=True)
         mensajes = ESTADO_GLOBAL.get("mensajes_bitacora", [])
 
@@ -1233,18 +1277,11 @@ def render_tablero_fluido():
                 c_sec = 0
                 c_num = 0
 
-                # LÓGICA DE TIEMPO Y RE-ALARMA A 4 MINUTOS (240 SEGUNDOS)
                 if msg.get("prioridad") == "Urgente" and msg.get("estado") == "Pendiente":
                     ts_start = msg.get("timestamp", now_curr)
                     elapsed = max(0, now_curr - ts_start)
                     c_sec = elapsed % 240
                     c_num = int(elapsed // 240)
-
-                    # Disparar alarma cuando entra a un nuevo ciclo o es nuevo (-1)
-                    if msg.get("last_sound_cycle", -1) < c_num:
-                        msg["last_sound_cycle"] = c_num
-                        if st.session_state.sound_enabled:
-                            reproducir_alarma_audio()
 
                 # DIBUJAR TARJETA DE NOVEDAD
                 st.markdown(render_chat_message_html(msg, cycle_sec=c_sec, cycle_num=c_num), unsafe_allow_html=True)
