@@ -51,13 +51,13 @@ st.markdown(
     }
     .kpi-value { color: #FFFFFF; font-size: 22px; font-weight: 800; line-height: 1.1; }
 
-    /* TARJETAS DE PROGRESO DE ETAPA POR ÓRDEN */
+    /* TARJETAS DE PROGRESO DE ETAPA POR ÓRDEN (AJUSTADO "UN TRIS" MÁS COMPACTO) */
     .progress-order-card {
         background-color: #111827;
         border: 1px solid #1F2937;
-        border-radius: 5px;
-        padding: 5px 8px;
-        margin-bottom: 3px;
+        border-radius: 4px;
+        padding: 3px 6px;
+        margin-bottom: 2px;
     }
 
     /* CONTROLES Y BOTONES */
@@ -133,7 +133,6 @@ if "last_search_time" not in st.session_state:
 if "last_search_val" not in st.session_state:
     st.session_state.last_search_val = ""
 
-# NUEVOS ESTADOS DE SESIÓN PARA LAS MODIFICACIONES SOLICITADAS
 if "acknowledged_urgents" not in st.session_state:
     st.session_state.acknowledged_urgents = set()
 if "urgent_start_times" not in st.session_state:
@@ -206,7 +205,6 @@ def parsear_fecha(val):
     return None
 
 
-# MODIFICACIÓN 4: DETALLE DEL PASO FALTANTE EN ÓRDENES
 def calcular_progreso_orden(row):
     progreso = 25
     cer = str(row.get("Cer firmado", row.get("CER FIRMADO", ""))).strip().upper()
@@ -382,7 +380,6 @@ def render_dark_table(df_page):
     return html
 
 
-# MODIFICACIÓN 3: TARJETA DE BITÁCORA CON BARRA DINÁMICA DE TIEMPO
 def render_bitacora_card(prioridad_val, descripcion_val, estado_val, is_ack=False):
     prioridad = (
         str(prioridad_val if pd.notna(prioridad_val) else "NORMAL").strip().upper()
@@ -435,7 +432,6 @@ def render_bitacora_card(prioridad_val, descripcion_val, estado_val, is_ack=Fals
         {"bg": "rgba(107, 114, 128, 0.2)", "text": "#E5E7EB", "border": "#9CA3AF"},
     )
 
-    # BARRA VIVA DE TIEMPO SI ES URGENTE
     bar_html = ""
     if prioridad == "URGENTE":
         start_t = st.session_state.urgent_start_times.get(descripcion, time.time())
@@ -474,7 +470,6 @@ def render_bitacora_card(prioridad_val, descripcion_val, estado_val, is_ack=Fals
 def render_tablero_fluido():
     df_main, df_bitacora, info_estado = cargar_datos_gsheets()
 
-    # DETECCION Y CONTROL DE TIEMPO PARA NOTAS 'URGENTE'
     urgentes_no_enteradas = []
     if df_bitacora is not None and not df_bitacora.empty:
         col_p = next(
@@ -492,11 +487,9 @@ def render_tablero_fluido():
                     if desc_val not in st.session_state.urgent_start_times:
                         st.session_state.urgent_start_times[desc_val] = time.time()
                     
-                    # SI NO SE HA DADO CLICK EN "ENTERADO", SIGUE PENDIENTE DE ALARMA
                     if desc_val not in st.session_state.acknowledged_urgents:
                         urgentes_no_enteradas.append(desc_val)
 
-    # MODIFICACIÓN 2: ALARMA CONTINUA MIENTRAS EXISTAN NOTAS SIN DARSES 'ENTERADO'
     if urgentes_no_enteradas:
         texto_alerta = " / ".join(urgentes_no_enteradas).replace("'", "\\'").replace("\n", " ")
         components.html(
@@ -533,7 +526,6 @@ def render_tablero_fluido():
             width=0,
         )
 
-    # UNLOCKER DE AUDIO INVISIBLE GLOBAL
     components.html(
         """
         <script>
@@ -683,7 +675,6 @@ def render_tablero_fluido():
 
             df_hoy = df_vista[df_vista["Fecha_dt"] == hoy_dt].copy()
 
-            # BÚSQUEDA DE INCOMPLETAS ANTERIORES PARA LA PÁGINA 2 RELÁMPAGO
             df_anteriores = df_vista[df_vista["Fecha_dt"] < hoy_dt].copy()
             incompletas_list = []
             for _, r_ant in df_anteriores.iterrows():
@@ -805,7 +796,7 @@ def render_tablero_fluido():
         duracion_total = duracion_base + st.session_state.get("manual_nav_bonus", 0)
 
         ahora = time.time()
-        tiempo_transcurrido = ahora - st.session_state.last_switch_time
+        tiempo_transcurrido = me_transcurrido = ahora - st.session_state.last_switch_time
 
         if tiempo_transcurrido >= duracion_total and total_paginas > 1:
             st.session_state.page_index = (st.session_state.page_index + 1) % total_paginas
@@ -823,10 +814,13 @@ def render_tablero_fluido():
 
         st.markdown(render_dark_table(df_pagina), unsafe_allow_html=True)
 
-        # MODIFICACIÓN 1: DESPLAZAMIENTO RÁPIDO CON NÚMEROS DE PÁGINA
+        # BOTONES DE PAGINACIÓN PEGANITOS Y AGRUPADOS
         if total_paginas > 1:
-            btn_cols = st.columns(min(total_paginas, 12))
-            for i in range(min(total_paginas, 12)):
+            num_btns = min(total_paginas, 12)
+            # Creamos columnas muy estrechas para los botones y dejamos el sobrante a la derecha
+            col_widths = [0.04] * num_btns + [1.0 - (0.04 * num_btns)]
+            btn_cols = st.columns(col_widths)
+            for i in range(num_btns):
                 with btn_cols[i]:
                     label = f"• {i+1} •" if i == st.session_state.page_index else f"{i+1}"
                     if st.button(label, key=f"num_page_btn_{i}"):
@@ -847,16 +841,15 @@ def render_tablero_fluido():
     c_left, c_middle, c_right = st.columns([1.2, 1.1, 1.2])
 
     with c_left:
-        # MODIFICACIÓN 5: PÁGINA 2 RELÁMPAGO (5s) PARA INCOMPLETAS ANTERIORES
         has_anteriores_inc = not df_anteriores_incompletas.empty
         now_p = time.time()
         dt_p = now_p - st.session_state.prog_day_last_switch
 
         if has_anteriores_inc:
-            if st.session_state.prog_day_page == 0 and dt_p >= 20:  # 20s en Hoy
+            if st.session_state.prog_day_page == 0 and dt_p >= 20:
                 st.session_state.prog_day_page = 1
                 st.session_state.prog_day_last_switch = now_p
-            elif st.session_state.prog_day_page == 1 and dt_p >= 5: # 5s relámpago en Incompletas
+            elif st.session_state.prog_day_page == 1 and dt_p >= 5:
                 st.session_state.prog_day_page = 0
                 st.session_state.prog_day_last_switch = now_p
 
@@ -883,32 +876,32 @@ def render_tablero_fluido():
             acumulado_general = int(np.mean([p[1] for p in progresos]))
             
             st.markdown(
-                f'<div style="background-color: #111827; border: 1px solid #1F2937; border-radius: 5px; padding: 4px 8px; margin-bottom: 4px;">'
-                f'<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px;">'
-                f'<span style="font-size: 10.5px; font-weight: 700; color: #9CA3AF;">PROMEDIO VISTA</span>'
-                f'<span style="font-size: 12.5px; font-weight: 800; color: #38BDF8;">{acumulado_general}%</span>'
+                f'<div style="background-color: #111827; border: 1px solid #1F2937; border-radius: 4px; padding: 3px 6px; margin-bottom: 3px;">'
+                f'<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1px;">'
+                f'<span style="font-size: 10px; font-weight: 700; color: #9CA3AF;">PROMEDIO VISTA</span>'
+                f'<span style="font-size: 11.5px; font-weight: 800; color: #38BDF8;">{acumulado_general}%</span>'
                 f'</div>'
-                f'<div style="background-color: #1F2937; border-radius: 4px; height: 6px; width: 100%; overflow: hidden;">'
+                f'<div style="background-color: #1F2937; border-radius: 3px; height: 5px; width: 100%; overflow: hidden;">'
                 f'<div style="background: linear-gradient(90deg, #3B82F6, #10B981); height: 100%; width: {acumulado_general}%;"></div>'
                 f'</div>'
                 f'</div>',
                 unsafe_allow_html=True,
             )
 
-            # MODIFICACIÓN 4: DESPLEGADO COMPLETO Y DETALLE DE PASO FALTANTE
-            html_progresos = '<div style="display: flex; flex-direction: column; gap: 3px;">'
+            # DESPLEGADO REDUCIDO LIGERAMENTE ("UN TRIS") PARA NAVEGACIÓN SIN SCROLL
+            html_progresos = '<div style="display: flex; flex-direction: column; gap: 2px;">'
             for ord_num, pct, txt_falta in progresos:
                 bar_color = "#10B981" if pct == 100 else ("#3B82F6" if pct >= 50 else "#F59E0B")
                 html_progresos += (
                     f'<div class="progress-order-card">'
-                    f'<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px;">'
-                    f'<span style="font-size: 11.5px; font-weight: 700; color: #F3F4F6;">📦 Orden #{ord_num}</span>'
-                    f'<span style="font-size: 11px; font-weight: 800; color: {bar_color};">{pct}%</span>'
+                    f'<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1px;">'
+                    f'<span style="font-size: 11px; font-weight: 700; color: #F3F4F6;">📦 Orden #{ord_num}</span>'
+                    f'<span style="font-size: 10.5px; font-weight: 800; color: {bar_color};">{pct}%</span>'
                     f'</div>'
-                    f'<div style="background-color: #1F2937; border-radius: 3px; height: 5px; width: 100%; overflow: hidden; margin-bottom: 2px;">'
+                    f'<div style="background-color: #1F2937; border-radius: 3px; height: 4px; width: 100%; overflow: hidden; margin-bottom: 1px;">'
                     f'<div style="background-color: {bar_color}; height: 100%; width: {pct}%;"></div>'
                     f'</div>'
-                    f'<div style="font-size: 9.5px; color: #9CA3AF; font-weight: 600;">{txt_falta}</div>'
+                    f'<div style="font-size: 9px; color: #9CA3AF; font-weight: 600;">{txt_falta}</div>'
                     f'</div>'
                 )
             html_progresos += '</div>'
@@ -956,7 +949,6 @@ def render_tablero_fluido():
                 )
                 df_bitacora = df_bitacora.sort_values(by="_prio_sort").drop(columns=["_prio_sort"])
 
-            # RENDERIZADO CON BOTÓN 'ENTERADO' Y BARRAS VIVAS DE TIEMPO
             for idx_b, r in df_bitacora.iterrows():
                 p_val = r[col_p] if col_p else "NORMAL"
                 d_val = str(r[col_d] if col_d else "").strip()
@@ -966,7 +958,6 @@ def render_tablero_fluido():
                 
                 st.markdown(render_bitacora_card(p_val, d_val, e_val, is_ack=is_ack), unsafe_allow_html=True)
                 
-                # MODIFICACIÓN 2: BOTÓN ENTERADO SILENCIADOR
                 if str(p_val).strip().upper() == "URGENTE" and not is_ack:
                     if st.button("✅ Enterado", key=f"btn_ack_{idx_b}"):
                         st.session_state.acknowledged_urgents.add(d_val)
