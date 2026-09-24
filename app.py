@@ -12,6 +12,24 @@ import streamlit.components.v1 as components
 SPREADSHEET_ID = "1CvPEtDspm7g3T7yXDluEUD7kGyWH5abNAP1nkalX6sI"
 
 # ---------------------------------------------------------
+# LISTA DE INVOLUCRADOS (EMISORES Y RECEPTORES)
+# ---------------------------------------------------------
+LISTA_EMISORES = [
+    "Jeison Altamar",
+    "Nicolas Arevalo",
+    "Jhojan Pasachoa",
+    "Sonia Gonzales"
+]
+
+LISTA_RECEPTORES = [
+    "Todos",
+    "Jeison Altamar",
+    "Nicolas Arevalo",
+    "Jhojan Pasachoa",
+    "Sonia Gonzales"
+]
+
+# ---------------------------------------------------------
 # CONFIGURACIÓN DE PÁGINA
 # ---------------------------------------------------------
 st.set_page_config(
@@ -28,6 +46,8 @@ def obtener_estado_global():
         "acknowledged_urgents": set(), # note_key que ya fueron confirmados
         "urgent_cycles": {},           # note_key -> número de aviso/ciclo (1, 2, 3...)
         "urgent_sound_triggered": {},  # note_key -> bool (sonó en este ciclo)
+        "mensajes_bitacora": [],       # Historial estructurado de chat de bitácora
+        "cargado_gsheet": False,       # Bandera de lectura inicial desde Google Sheets
     }
 
 ESTADO_GLOBAL = obtener_estado_global()
@@ -185,27 +205,114 @@ st.markdown(
         padding: 2px 8px !important;
     }
 
-    /* ANIMACIONES BITÁCORA */
-    @keyframes pulse-preaviso {
+    /* SELECTOR SEGMENTADO MODO OSCURO (RADIO BUTTONS) */
+    div[data-testid="stRadio"] > div {
+        display: flex;
+        flex-direction: row;
+        background-color: #111827;
+        border: 1px solid #374151;
+        border-radius: 6px;
+        padding: 2px;
+        gap: 3px;
+    }
+    div[data-testid="stRadio"] label {
+        flex: 1;
+        text-align: center;
+        background-color: #1F2937;
+        border-radius: 4px;
+        padding: 3px 6px !important;
+        font-size: 11px !important;
+        font-weight: 700 !important;
+        color: #D1D5DB !important;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+    div[data-testid="stRadio"] label:hover {
+        background-color: #374151;
+        color: #FFFFFF !important;
+    }
+
+    /* ESTILOS DE MÓDULO CHAT / BITÁCORA */
+    .chat-container {
+        max-height: 420px;
+        overflow-y: auto;
+        padding-right: 4px;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+    }
+
+    .msg-card-normal {
+        background: #111827;
+        border-left: 4px solid #10B981;
+        border-radius: 6px;
+        padding: 7px 10px;
+        border-top: 1px solid #1F2937;
+        border-right: 1px solid #1F2937;
+        border-bottom: 1px solid #1F2937;
+    }
+
+    .msg-card-auditoria {
+        background: #161D2F;
+        border-left: 4px solid #F59E0B;
+        border: 1px solid #F59E0B;
+        border-radius: 6px;
+        padding: 7px 10px;
+        box-shadow: 0 0 8px rgba(245, 158, 11, 0.2);
+    }
+
+    @keyframes pulse-urgente {
         0% { border-color: #EF4444; box-shadow: 0 0 5px rgba(239, 68, 68, 0.4); }
         50% { border-color: #FCA5A5; box-shadow: 0 0 16px rgba(239, 68, 68, 0.9); }
         100% { border-color: #EF4444; box-shadow: 0 0 5px rgba(239, 68, 68, 0.4); }
     }
-    .card-urgente-activa {
-        background: linear-gradient(180deg, #18090C 0%, #111827 100%) !important;
-        border: 2px solid #EF4444 !important;
-        box-shadow: 0 0 12px rgba(239, 68, 68, 0.4) !important;
+    .msg-card-urgente {
+        background: linear-gradient(180deg, #2A080C 0%, #111827 100%);
+        border: 2px solid #EF4444;
+        animation: pulse-urgente 1.2s infinite;
         border-radius: 6px;
         padding: 7px 10px;
-        margin-bottom: 5px;
     }
-    .card-urgente-preaviso {
-        background: linear-gradient(180deg, #2A080C 0%, #111827 100%) !important;
-        border: 2px solid #EF4444 !important;
-        animation: pulse-preaviso 1s infinite !important;
+
+    .msg-card-atendido {
+        background: #0D1520;
+        border-left: 4px solid #10B981;
+        border: 1px solid #1F2937;
         border-radius: 6px;
         padding: 7px 10px;
-        margin-bottom: 5px;
+        opacity: 0.9;
+    }
+
+    .badge-prio-normal {
+        background-color: rgba(16, 185, 129, 0.2);
+        color: #A7F3D0;
+        border: 1px solid #10B981;
+        font-size: 10px;
+        font-weight: 700;
+        padding: 1px 5px;
+        border-radius: 4px;
+    }
+
+    .badge-prio-auditoria {
+        background-color: rgba(245, 158, 11, 0.25);
+        color: #FDE68A;
+        border: 1px solid #F59E0B;
+        font-size: 10px;
+        font-weight: 800;
+        padding: 1px 5px;
+        border-radius: 4px;
+        letter-spacing: 0.5px;
+    }
+
+    .badge-prio-urgente {
+        background-color: rgba(239, 68, 68, 0.3);
+        color: #FCA5A5;
+        border: 1px solid #EF4444;
+        font-size: 10px;
+        font-weight: 800;
+        padding: 1px 5px;
+        border-radius: 4px;
+        letter-spacing: 0.5px;
     }
 
     /* ANIMACIÓN PARPADEO TABLA CORRECCIÓN */
@@ -472,106 +579,89 @@ def render_dark_table(df_page):
 
 
 # ---------------------------------------------------------
-# RENDERIZADO TARJETA DE BITÁCORA CON RE-ESCALACIÓN Y PRE-AVISO
+# RENDERIZADO TARJETA DE MENSAJE DE BITÁCORA (CHAT)
 # ---------------------------------------------------------
-def render_bitacora_card(prioridad_val, descripcion_val, estado_val, elapsed_sec=0, is_ack=False, cycle_num=1):
-    prioridad = str(prioridad_val if pd.notna(prioridad_val) else "NORMAL").strip().upper()
-    descripcion = str(descripcion_val if pd.notna(descripcion_val) else "").strip()
-    
-    if is_ack and prioridad == "URGENTE":
-        estado = "EN ATENCIÓN"
-    else:
-        estado = str(estado_val if pd.notna(estado_val) else "PENDIENTE").strip().upper()
+def render_chat_message(msg):
+    emisor = msg.get("emisor", "Jeison Altamar")
+    receptor = msg.get("receptor", "Todos")
+    prioridad = msg.get("prioridad", "Normal")
+    contenido = msg.get("contenido", "")
+    fecha_hora = msg.get("fecha_hora", "")
+    estado = msg.get("estado", "Pendiente")
+    usuario_enterado = msg.get("usuario_enterado", None)
+    fecha_enterado = msg.get("fecha_enterado", None)
 
-    priority_colors = {
-        "URGENTE": "#EF4444",
-        "AUDITORÍA": "#A855F7",
-        "AUDITORIA": "#A855F7",
-        "REVISIÓN": "#F59E0B",
-        "REVISION": "#F59E0B",
-        "AVISO": "#3B82F6",
-        "NORMAL": "#6B7280",
-        "MANTENIMIENTO": "#10B981",
-    }
-    border_color = priority_colors.get(prioridad, "#3B82F6")
-
-    # SI ESTÁ ACK (ENTERADO) -> FORMATO COMPACTO Y SOBRIO
-    if is_ack and prioridad == "URGENTE":
-        return f'''
-        <div style="background: #0D1520; border: 1px solid #10B981; border-left: 4px solid #10B981; border-radius: 5px; padding: 5px 8px; margin-bottom: 3px;">
-            <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px;">
-                <div style="color: #E5E7EB; font-size: 11.5px; font-weight: 500; line-height: 1.2;">
-                    {descripcion}
+    if prioridad == "Urgente":
+        if estado == "Pendiente":
+            return f'''
+            <div class="msg-card-urgente">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                    <span class="badge-prio-urgente">🔴 URGENTE / CRÍTICO</span>
+                    <span style="font-size: 10px; color: #FCA5A5; font-weight: 700;">⏱️ {fecha_hora}</span>
                 </div>
-                <div style="background-color: rgba(16, 185, 129, 0.2); color: #A7F3D0; border: 1px solid #10B981; font-size: 9.5px; font-weight: 800; padding: 2px 6px; border-radius: 4px; white-space: nowrap;">
-                    ✓ RECIBIDO
+                <div style="font-size: 11px; color: #9CA3AF; margin-bottom: 4px;">
+                    <strong style="color: #F3F4F6;">De:</strong> {emisor} &nbsp;|&nbsp; <strong style="color: #F3F4F6;">Para:</strong> {receptor}
+                </div>
+                <div style="color: #FFFFFF; font-size: 12.5px; font-weight: 700; line-height: 1.3; margin-bottom: 4px;">
+                    🚨 {contenido}
+                </div>
+                <div style="font-size: 10px; color: #EF4444; font-weight: 700;">
+                    ⚠️ Alerta activa - Requiere atención inmediata
                 </div>
             </div>
-        </div>
-        '''
-
-    # SI ES URGENTE Y NO ATENDIDO -> MODO ALERTA DINÁMICO CICLICO
-    if prioridad == "URGENTE":
-        elapsed_sec = max(0, int(elapsed_sec))
-        restante_sec = max(0, 600 - elapsed_sec)
-        
-        mins_r = restante_sec // 60
-        secs_r = restante_sec % 60
-        time_formatted = f"{mins_r:02d}:{secs_r:02d}"
-        
-        pct_bar = min(100, max(0, int((elapsed_sec / 600.0) * 100)))
-        
-        # PRE-AVISO DE DISPARO (ÚLTIMOS 2 MINUTOS: > 480 SEG)
-        es_preaviso = elapsed_sec >= 480
-        card_class = "card-urgente-preaviso" if es_preaviso else "card-urgente-activa"
-        
-        if es_preaviso:
-            txt_t = f"🚨 ALARMA INMINENTE EN: {time_formatted}"
-            bar_color = "#EF4444"
+            '''
         else:
-            txt_t = f"⏱️ Reinicio de alarma en: {time_formatted}"
-            bar_color = "#F59E0B" if elapsed_sec >= 300 else "#10B981"
-
-        reincidencia_tag = f"<b>AVISO #{cycle_num}</b>" if cycle_num == 1 else f"<b style='color:#FCA5A5;'>REINCIDENCIA #{cycle_num}</b>"
-
-        return f'''
-        <div class="{card_class}">
-            <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; margin-bottom: 3px;">
-                <div style="color: #FFFFFF; font-size: 12.5px; font-weight: 700; line-height: 1.25;">
-                    🚨 {descripcion}
+            return f'''
+            <div class="msg-card-atendido">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 3px;">
+                    <span style="background: rgba(16, 185, 129, 0.2); color: #A7F3D0; border: 1px solid #10B981; font-size: 9.5px; font-weight: 800; padding: 2px 6px; border-radius: 4px;">
+                        ✓ ATENDIDO
+                    </span>
+                    <span style="font-size: 10px; color: #9CA3AF;">{fecha_hora}</span>
                 </div>
-                <div style="background-color: rgba(239, 68, 68, 0.25); color: #FCA5A5; border: 1px solid #EF4444; font-size: 9.5px; font-weight: 800; padding: 2px 6px; border-radius: 4px; white-space: nowrap;">
-                    {reincidencia_tag}
+                <div style="font-size: 11px; color: #9CA3AF; margin-bottom: 2px;">
+                    <strong style="color: #D1D5DB;">De:</strong> {emisor} &nbsp;|&nbsp; <strong style="color: #D1D5DB;">Para:</strong> {receptor}
+                </div>
+                <div style="color: #E5E7EB; font-size: 12px; font-weight: 500; line-height: 1.25;">
+                    {contenido}
+                </div>
+                <div style="font-size: 9.5px; color: #34D399; margin-top: 4px; font-weight: 600;">
+                    ✅ Enterado por: <strong>{usuario_enterado}</strong> a las {fecha_enterado}
                 </div>
             </div>
-            <div style="margin-top: 4px;">
-                <div style="display: flex; justify-content: space-between; align-items: center; font-size: 9.5px; color: {bar_color}; font-weight: 700; margin-bottom: 1px;">
-                    <span>{txt_t}</span>
-                    <span>{pct_bar}%</span>
-                </div>
-                <div style="background-color: #1F2937; border-radius: 3px; height: 5px; width: 100%; overflow: hidden;">
-                    <div style="background-color: {bar_color}; height: 100%; width: {pct_bar}%;"></div>
-                </div>
+            '''
+
+    elif prioridad == "Auditoría":
+        return f'''
+        <div class="msg-card-auditoria">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                <span class="badge-prio-auditoria">🟡 AUDITORÍA / CALIDAD</span>
+                <span style="font-size: 10px; color: #FDE68A; font-weight: 700;">🕒 {fecha_hora}</span>
+            </div>
+            <div style="font-size: 11px; color: #9CA3AF; margin-bottom: 4px;">
+                <strong style="color: #F3F4F6;">De:</strong> {emisor} &nbsp;|&nbsp; <strong style="color: #F3F4F6;">Para:</strong> {receptor}
+            </div>
+            <div style="color: #F3F4F6; font-size: 12px; font-weight: 600; line-height: 1.3;">
+                {contenido}
             </div>
         </div>
         '''
 
-    # FORMATO ESTÁNDAR OTRA PRIORIDAD
-    status_styles = {
-        "PENDIENTE": {"bg": "rgba(239, 68, 68, 0.2)", "text": "#FCA5A5", "border": "#EF4444"},
-        "EN PROCESO": {"bg": "rgba(245, 158, 11, 0.2)", "text": "#FDE68A", "border": "#F59E0B"},
-        "COMPLETADO": {"bg": "rgba(16, 185, 129, 0.2)", "text": "#A7F3D0", "border": "#10B981"},
-    }
-    s_style = status_styles.get(estado, {"bg": "rgba(107, 114, 128, 0.2)", "text": "#E5E7EB", "border": "#9CA3AF"})
-
-    return f'''
-    <div style="background: #111827; border-left: 3px solid {border_color}; border-radius: 5px; padding: 5px 8px; margin-bottom: 3px;">
-        <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px;">
-            <div style="color: #F3F4F6; font-size: 12px; font-weight: 500; line-height: 1.2;">{descripcion}</div>
-            <div style="background-color: {s_style["bg"]}; color: {s_style["text"]}; border: 1px solid {s_style["border"]}; font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 6px; white-space: nowrap;">{estado}</div>
+    else:  # Normal
+        return f'''
+        <div class="msg-card-normal">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 3px;">
+                <span class="badge-prio-normal">🟢 NORMAL</span>
+                <span style="font-size: 10px; color: #9CA3AF;">{fecha_hora}</span>
+            </div>
+            <div style="font-size: 10.5px; color: #9CA3AF; margin-bottom: 3px;">
+                <strong style="color: #D1D5DB;">De:</strong> {emisor} &nbsp;|&nbsp; <strong style="color: #D1D5DB;">Para:</strong> {receptor}
+            </div>
+            <div style="color: #F3F4F6; font-size: 12px; font-weight: 500; line-height: 1.25;">
+                {contenido}
+            </div>
         </div>
-    </div>
-    '''
+        '''
 
 
 # ---------------------------------------------------------
@@ -591,54 +681,58 @@ def toggle_sonido():
 def render_tablero_fluido():
     df_main, df_bitacora, info_estado = cargar_datos_gsheets()
 
-    activar_sonido_emergencia = False
-    cant_urgencias_activas = 0
-    urgent_elapsed_map = {}
-    
-    # ---------------------------------------------------------
-    # PROCESAMIENTO DE RE-ESCALACIÓN Y CICLOS DE 10 MINUTOS
-    # ---------------------------------------------------------
-    if df_bitacora is not None and not df_bitacora.empty:
+    # inicialización / sincronización de bitácora
+    if "mensajes_bitacora" not in ESTADO_GLOBAL:
+        ESTADO_GLOBAL["mensajes_bitacora"] = []
+
+    if not ESTADO_GLOBAL.get("cargado_gsheet", False) and df_bitacora is not None and not df_bitacora.empty:
         col_p = next((c for c in df_bitacora.columns if any(k in str(c).upper() for k in ["PRIORI", "PO", "TIPO"])), None)
         col_d = next((c for c in df_bitacora.columns if any(k in str(c).upper() for k in ["DESCRIP", "NOTA", "AVISO"])), None)
+        col_e = next((c for c in df_bitacora.columns if "ESTADO" in str(c).upper()), None)
+        col_em = next((c for c in df_bitacora.columns if "DE" in str(c).upper() or "EMISOR" in str(c).upper()), None)
+        col_rec = next((c for c in df_bitacora.columns if "PARA" in str(c).upper() or "RECEPTOR" in str(c).upper()), None)
 
-        if col_p and col_d:
-            now_time = time.time()
-            for idx_b, row in df_bitacora.iterrows():
-                prio_val = str(row[col_p]).strip().upper()
-                desc_val = str(row[col_d]).strip()
-                note_key = f"{idx_b}_{desc_val}"
-                
-                if prio_val == "URGENTE" and desc_val:
-                    # Inicializar nota si es nueva
-                    if note_key not in ESTADO_GLOBAL["urgent_start_times"]:
-                        ESTADO_GLOBAL["urgent_start_times"][note_key] = now_time
-                        ESTADO_GLOBAL["urgent_cycles"][note_key] = 1
-                        ESTADO_GLOBAL["urgent_sound_triggered"][note_key] = False
+        for idx_b, r in df_bitacora.iterrows():
+            d_val = str(r[col_d] if col_d else "").strip()
+            if not d_val:
+                continue
+            
+            p_val_raw = str(r[col_p] if col_p else "NORMAL").strip().upper()
+            if "URG" in p_val_raw:
+                prio_clean = "Urgente"
+            elif "AUD" in p_val_raw or "CALID" in p_val_raw:
+                prio_clean = "Auditoría"
+            else:
+                prio_clean = "Normal"
 
-                    start_t = ESTADO_GLOBAL["urgent_start_times"][note_key]
-                    elapsed = max(0, now_time - start_t)
+            e_val_raw = str(r[col_e] if col_e else "PENDIENTE").strip().upper()
+            est_clean = "Atendido" if "ATEND" in e_val_raw or "COMPLET" in e_val_raw else "Pendiente"
+            
+            emisor_raw = str(r[col_em]).strip() if col_em and str(r[col_em]).strip() in LISTA_EMISORES else "Jeison Altamar"
+            receptor_raw = str(r[col_rec]).strip() if col_rec and str(r[col_rec]).strip() in LISTA_RECEPTORES else "Todos"
 
-                    # SI NO HA SIDO ATENDIDA -> EVALUAR CICLO
-                    if note_key not in ESTADO_GLOBAL["acknowledged_urgents"]:
-                        cant_urgencias_activas += 1
-                        
-                        # REINICIO AUTOMÁTICO DE 10 MINUTOS (600 SEGUNDOS)
-                        if elapsed >= 600:
-                            ESTADO_GLOBAL["urgent_start_times"][note_key] = now_time
-                            ESTADO_GLOBAL["urgent_cycles"][note_key] = ESTADO_GLOBAL["urgent_cycles"].get(note_key, 1) + 1
-                            ESTADO_GLOBAL["urgent_sound_triggered"][note_key] = False
-                            elapsed = 0
+            ESTADO_GLOBAL["mensajes_bitacora"].append({
+                "id": f"gs_{idx_b}_{int(time.time())}",
+                "emisor": emisor_raw,
+                "receptor": receptor_raw,
+                "prioridad": prio_clean,
+                "contenido": d_val,
+                "fecha_hora": datetime.now().strftime("%d/%m/%Y %H:%M"),
+                "estado": est_clean,
+                "usuario_enterado": None,
+                "fecha_enterado": None
+            })
+        ESTADO_GLOBAL["cargado_gsheet"] = True
 
-                        # GATILLO DE SONIDO POR CADA CICLO
-                        if not ESTADO_GLOBAL["urgent_sound_triggered"].get(note_key, False):
-                            activar_sonido_emergencia = True
-                            ESTADO_GLOBAL["urgent_sound_triggered"][note_key] = True
+    # EVALUACIÓN DE MENSAJES URGENTES PENDIENTES
+    urgentes_pendientes = [
+        m for m in ESTADO_GLOBAL["mensajes_bitacora"]
+        if m.get("prioridad") == "Urgente" and m.get("estado") == "Pendiente"
+    ]
+    cant_urgencias_activas = len(urgentes_pendientes)
 
-                    urgent_elapsed_map[note_key] = elapsed
-
-    # DISPARAR SONIDO SI AUDIO ESTÁ HABILITADO
-    if activar_sonido_emergencia and st.session_state.sound_enabled:
+    # DISPARAR AUDIO SI AUDIO ESTÁ HABILITADO Y HAY URGENCIAS PENDIENTES
+    if cant_urgencias_activas > 0 and st.session_state.sound_enabled:
         reproducir_alarma_audio()
 
     # BANNER FLOTANTE SUPERIOR SI HAY URGENCIAS PENDIENTES
@@ -646,8 +740,8 @@ def render_tablero_fluido():
         st.markdown(
             f'''
             <div class="top-urgent-banner">
-                <span>🚨 ATENCIÓN INMEDIATA: Hay {cant_urgencias_activas} alerta(s) URGENTE(S) sin atender en la Bitácora.</span>
-                <span style="font-size: 11px; background: rgba(0,0,0,0.3); padding: 2px 8px; border-radius: 4px;">Atender abajo ⬇️</span>
+                <span>🚨 ATENCIÓN INMEDIATA: Hay {cant_urgencias_activas} novedad(es) URGENTE(S) sin atender en la Bitácora.</span>
+                <span style="font-size: 11px; background: rgba(0,0,0,0.3); padding: 2px 8px; border-radius: 4px;">Atender abajo en Bitácora ⬇️</span>
             </div>
             ''',
             unsafe_allow_html=True
@@ -1029,12 +1123,14 @@ def render_tablero_fluido():
             unsafe_allow_html=True,
         )
 
+    # ---------------------------------------------------------
+    # BITÁCORA DIGITAL DE LABORATORIO (CHAT INTERACTIVO)
+    # ---------------------------------------------------------
     with c_right:
-        # ENCABEZADO BITÁCORA + BOTÓN DE AUDIO HIGH-CONTRAST
         col_b1, col_b2 = st.columns([0.60, 0.40])
         with col_b1:
-            st.markdown("<h4 style='margin:0 0 1px 0; font-size:13.5px; color:#F3F4F6;'>📌 Bitácora / Avisos</h4>", unsafe_allow_html=True)
-            st.caption("Notas en tiempo real")
+            st.markdown("<h4 style='margin:0 0 1px 0; font-size:13.5px; color:#F3F4F6;'>📌 Bitácora / Chat</h4>", unsafe_allow_html=True)
+            st.caption("Novedades y Registro Operativo")
         with col_b2:
             if st.session_state.sound_enabled:
                 st.markdown('<div class="btn-audio-on">', unsafe_allow_html=True)
@@ -1045,50 +1141,94 @@ def render_tablero_fluido():
                 st.button("🔇 MUTE OFF", on_click=toggle_sonido, key="btn_audio_state_off")
                 st.markdown('</div>', unsafe_allow_html=True)
 
-        if df_bitacora is None or df_bitacora.empty:
-            st.info("Sin avisos en 'NOTAS DEL DIA'.")
+        # FORMULARIO PARA REGISTRAR NUEVO MENSAJE
+        with st.expander("💬 Registrar Novedad en Bitácora", expanded=False):
+            col_f1, col_f2 = st.columns(2)
+            with col_f1:
+                emisor_sel = st.selectbox(
+                    "De (Emisor):",
+                    options=LISTA_EMISORES,
+                    key="bit_emisor_sel"
+                )
+            with col_f2:
+                receptor_sel = st.selectbox(
+                    "Para (Receptor):",
+                    options=LISTA_RECEPTORES,
+                    index=0,
+                    key="bit_receptor_sel"
+                )
+
+            st.markdown("<label style='font-size:11px; font-weight:700; color:#9CA3AF;'>Prioridad del Mensaje:</label>", unsafe_allow_html=True)
+            prio_option = st.radio(
+                "Prioridad",
+                options=["🟢 Normal", "🟡 Auditoría", "🔴 Urgente"],
+                horizontal=True,
+                label_visibility="collapsed",
+                key="bit_prio_radio"
+            )
+
+            prio_clean = "Normal"
+            if "Auditoría" in prio_option:
+                prio_clean = "Auditoría"
+            elif "Urgente" in prio_option:
+                prio_clean = "Urgente"
+
+            contenido_input = st.text_area(
+                "Contenido / Novedad:",
+                placeholder="Escriba aquí la novedad u observación...",
+                height=65,
+                key="bit_contenido_txt"
+            )
+
+            if st.button("📤 Publicar Novedad", key="btn_publicar_bitacora"):
+                if contenido_input.strip():
+                    nuevo_msg = {
+                        "id": f"msg_{int(time.time() * 1000)}",
+                        "emisor": emisor_sel,
+                        "receptor": receptor_sel,
+                        "prioridad": prio_clean,
+                        "contenido": contenido_input.strip(),
+                        "fecha_hora": datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
+                        "estado": "Pendiente",
+                        "usuario_enterado": None,
+                        "fecha_enterado": None
+                    }
+                    ESTADO_GLOBAL["mensajes_bitacora"].insert(0, nuevo_msg)
+                    st.success("¡Novedad publicada correctamente!")
+                    st.rerun()
+                else:
+                    st.warning("Escriba el contenido antes de enviar.")
+
+        # FEED TIPO CHAT DE NOVEDADES
+        st.markdown("<div class='chat-container'>", unsafe_allow_html=True)
+        mensajes = ESTADO_GLOBAL.get("mensajes_bitacora", [])
+
+        if not mensajes:
+            st.info("Sin mensajes registrados en la Bitácora.")
         else:
-            col_p = next((c for c in df_bitacora.columns if any(k in str(c).upper() for k in ["PRIORI", "PO", "TIPO"])), None)
-            col_d = next((c for c in df_bitacora.columns if any(k in str(c).upper() for k in ["DESCRIP", "NOTA", "AVISO"])), None)
-            col_e = next((c for c in df_bitacora.columns if "ESTADO" in str(c).upper()), None)
+            for idx_m, msg in enumerate(mensajes):
+                st.markdown(render_chat_message(msg), unsafe_allow_html=True)
 
-            if col_p and col_p in df_bitacora.columns:
-                prio_map = {
-                    "URGENTE": 1,
-                    "AUDITORÍA": 2,
-                    "AUDITORIA": 2,
-                    "REVISIÓN": 3,
-                    "REVISION": 3,
-                    "AVISO": 4,
-                    "MANTENIMIENTO": 5,
-                    "NORMAL": 6,
-                }
-                df_bitacora["_prio_sort"] = df_bitacora[col_p].apply(
-                    lambda x: prio_map.get(str(x).strip().upper(), 99)
-                )
-                df_bitacora = df_bitacora.sort_values(by="_prio_sort").drop(columns=["_prio_sort"])
+                # ACCIÓN ✅ DAR ENTERADO PARA MENSAJES URGENTES PENDIENTES
+                if msg.get("prioridad") == "Urgente" and msg.get("estado") == "Pendiente":
+                    c_ack1, c_ack2 = st.columns([0.55, 0.45])
+                    with c_ack1:
+                        usr_confirm = st.selectbox(
+                            "Usuario Enterado",
+                            options=LISTA_EMISORES,
+                            key=f"sel_ack_usr_{msg['id']}_{idx_m}",
+                            label_visibility="collapsed"
+                        )
+                    with c_ack2:
+                        if st.button("✅ Dar Enterado", key=f"btn_enterado_{msg['id']}_{idx_m}"):
+                            msg["estado"] = "Atendido"
+                            msg["usuario_enterado"] = usr_confirm
+                            msg["fecha_enterado"] = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+                            st.rerun()
 
-            for idx_b, r in df_bitacora.iterrows():
-                p_val = r[col_p] if col_p else "NORMAL"
-                d_val = str(r[col_d] if col_d else "").strip()
-                e_val = r[col_e] if col_e else "PENDIENTE"
-                
-                note_key = f"{idx_b}_{d_val}"
-                elapsed_val = urgent_elapsed_map.get(note_key, 0)
-                is_ack = note_key in ESTADO_GLOBAL["acknowledged_urgents"]
-                cycle_num = ESTADO_GLOBAL["urgent_cycles"].get(note_key, 1)
-                
-                st.markdown(
-                    render_bitacora_card(
-                        p_val, d_val, e_val, elapsed_sec=elapsed_val, is_ack=is_ack, cycle_num=cycle_num
-                    ),
-                    unsafe_allow_html=True,
-                )
-                
-                if str(p_val).strip().upper() == "URGENTE" and not is_ack:
-                    if st.button(f"✅ Enterado (Detener Aviso #{cycle_num})", key=f"btn_ack_{idx_b}"):
-                        ESTADO_GLOBAL["acknowledged_urgents"].add(note_key)
-                        st.rerun()
+                st.markdown("<div style='margin-bottom: 2px;'></div>", unsafe_allow_html=True)
+
+        st.markdown("</div>", unsafe_allow_html=True)
 
 
 render_tablero_fluido()
