@@ -19,14 +19,15 @@ st.set_page_config(
 )
 
 # ---------------------------------------------------------
-# ESTADO GLOBAL COMPARTIDO Y DE SESIÓN
+# ESTADO GLOBAL COMPARTIDO (Servidor / Entre Usuarios)
 # ---------------------------------------------------------
 @st.cache_resource
 def obtener_estado_global():
     return {
-        "urgent_start_times": {},
-        "acknowledged_urgents": set(),
-        "urgent_sounded_stages": {},
+        "urgent_start_times": {},      # note_key -> timestamp de inicio de ciclo
+        "acknowledged_urgents": set(), # note_key que ya fueron confirmados
+        "urgent_cycles": {},           # note_key -> número de aviso/ciclo (1, 2, 3...)
+        "urgent_sound_triggered": {},  # note_key -> bool (sonó en este ciclo)
     }
 
 ESTADO_GLOBAL = obtener_estado_global()
@@ -52,7 +53,7 @@ if "alert_filter" not in st.session_state:
 
 
 # ---------------------------------------------------------
-# ESTILOS MODO OSCURO CON BOTÓN DE AUDIO REDISEÑADO
+# ESTILOS MODO OSCURO + NAVEGACIÓN Y EFECTOS DE IMPACTO
 # ---------------------------------------------------------
 st.markdown(
     """
@@ -67,6 +68,29 @@ st.markdown(
     }
 
     .stApp { background-color: #0B1120; color: #F3F4F6; font-size: 14px; }
+
+    /* BANNER SUPERIOR DE ALERTA CRÍTICA */
+    @keyframes pulse-banner {
+        0% { box-shadow: 0 0 10px rgba(239, 68, 68, 0.5); }
+        50% { box-shadow: 0 0 25px rgba(239, 68, 68, 0.95); }
+        100% { box-shadow: 0 0 10px rgba(239, 68, 68, 0.5); }
+    }
+    .top-urgent-banner {
+        background: linear-gradient(90deg, #DC2626 0%, #991B1B 100%);
+        color: #FFFFFF;
+        padding: 6px 14px;
+        border-radius: 6px;
+        margin-bottom: 8px;
+        font-weight: 800;
+        text-align: center;
+        font-size: 13.5px;
+        letter-spacing: 0.5px;
+        border: 1px solid #EF4444;
+        animation: pulse-banner 1.5s infinite;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
 
     /* TARJETAS KPI */
     .kpi-card {
@@ -117,7 +141,7 @@ st.markdown(
         box-shadow: 0 0 8px rgba(59, 130, 246, 0.5) !important;
     }
 
-    /* ESTILOS EXCLUSIVOS: BOTÓN AUDIO ON (VERDE ESMERALDA NEÓN) */
+    /* BOTONES DE AUDIO HIGH-CONTRAST NEÓN */
     .btn-audio-on div.stButton > button {
         background: linear-gradient(135deg, #10B981 0%, #047857 100%) !important;
         color: #FFFFFF !important;
@@ -127,16 +151,12 @@ st.markdown(
         font-weight: 800 !important;
         height: 30px !important;
         box-shadow: 0 0 10px rgba(16, 185, 129, 0.5) !important;
-        text-shadow: 0 1px 2px rgba(0,0,0,0.6) !important;
     }
     .btn-audio-on div.stButton > button:hover {
         background: linear-gradient(135deg, #34D399 0%, #10B981 100%) !important;
-        color: #FFFFFF !important;
-        border-color: #A7F3D0 !important;
         box-shadow: 0 0 15px rgba(52, 211, 153, 0.8) !important;
     }
 
-    /* ESTILOS EXCLUSIVOS: BOTÓN AUDIO OFF (ROJO CARMESÍ NEÓN) */
     .btn-audio-off div.stButton > button {
         background: linear-gradient(135deg, #EF4444 0%, #991B1B 100%) !important;
         color: #FFFFFF !important;
@@ -146,12 +166,9 @@ st.markdown(
         font-weight: 800 !important;
         height: 30px !important;
         box-shadow: 0 0 10px rgba(239, 68, 68, 0.5) !important;
-        text-shadow: 0 1px 2px rgba(0,0,0,0.6) !important;
     }
     .btn-audio-off div.stButton > button:hover {
         background: linear-gradient(135deg, #F87171 0%, #DC2626 100%) !important;
-        color: #FFFFFF !important;
-        border-color: #FCA5A5 !important;
         box-shadow: 0 0 15px rgba(248, 113, 113, 0.8) !important;
     }
 
@@ -168,25 +185,30 @@ st.markdown(
         padding: 2px 8px !important;
     }
 
-    /* BOTÓN DE BORRAR BÚSQUEDA (X) VISIBLE */
-    button[key="btn_x_clear"] {
-        background-color: #1F2937 !important;
-        color: #EF4444 !important;
-        border: 1px solid #374151 !important;
-        border-radius: 6px !important;
-        font-size: 12px !important;
-        font-weight: 800 !important;
-        height: 32px !important;
-        width: 100% !important;
-        padding: 0 !important;
+    /* ANIMACIONES BITÁCORA */
+    @keyframes pulse-preaviso {
+        0% { border-color: #EF4444; box-shadow: 0 0 5px rgba(239, 68, 68, 0.4); }
+        50% { border-color: #FCA5A5; box-shadow: 0 0 16px rgba(239, 68, 68, 0.9); }
+        100% { border-color: #EF4444; box-shadow: 0 0 5px rgba(239, 68, 68, 0.4); }
     }
-    button[key="btn_x_clear"]:hover {
-        background-color: #DC2626 !important;
-        color: #FFFFFF !important;
-        border-color: #EF4444 !important;
+    .card-urgente-activa {
+        background: linear-gradient(180deg, #18090C 0%, #111827 100%) !important;
+        border: 2px solid #EF4444 !important;
+        box-shadow: 0 0 12px rgba(239, 68, 68, 0.4) !important;
+        border-radius: 6px;
+        padding: 7px 10px;
+        margin-bottom: 5px;
+    }
+    .card-urgente-preaviso {
+        background: linear-gradient(180deg, #2A080C 0%, #111827 100%) !important;
+        border: 2px solid #EF4444 !important;
+        animation: pulse-preaviso 1s infinite !important;
+        border-radius: 6px;
+        padding: 7px 10px;
+        margin-bottom: 5px;
     }
 
-    /* ANIMACIÓN PARPADEO CORRECCIÓN */
+    /* ANIMACIÓN PARPADEO TABLA CORRECCIÓN */
     @keyframes pulse-correccion {
         0% { background-color: rgba(239, 68, 68, 0.12); }
         50% { background-color: rgba(239, 68, 68, 0.30); }
@@ -211,7 +233,7 @@ st.markdown(
 )
 
 # ---------------------------------------------------------
-# REPRODUCTOR DE AUDIO ROBUSTO
+# REPRODUCTOR DE AUDIO ALARMA
 # ---------------------------------------------------------
 def reproducir_alarma_audio():
     components.html(
@@ -224,17 +246,17 @@ def reproducir_alarma_audio():
                 var ctx = new AudioCtx();
                 
                 var now = ctx.currentTime;
-                var freqs = [880, 1200, 880, 1200];
+                var freqs = [880, 1200, 880, 1200, 1500];
                 
                 freqs.forEach(function(freq, i) {
-                    var t = now + (i * 0.15);
+                    var t = now + (i * 0.14);
                     var osc = ctx.createOscillator();
                     var gain = ctx.createGain();
                     
                     osc.type = 'sawtooth';
                     osc.frequency.setValueAtTime(freq, t);
                     
-                    gain.gain.setValueAtTime(0.3, t);
+                    gain.gain.setValueAtTime(0.35, t);
                     gain.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
                     
                     osc.connect(gain);
@@ -253,7 +275,7 @@ def reproducir_alarma_audio():
 
 
 # ---------------------------------------------------------
-# FUNCIONES AUXILIARES Y PARSER DE DATOS
+# FUNCIONES AUXILIARES Y PARSER
 # ---------------------------------------------------------
 def limpiar_texto(val):
     if pd.isna(val) or val is None:
@@ -280,11 +302,7 @@ def parsear_fecha(val):
         return val.date()
 
     val_str = str(val).strip()
-    if (
-        not val_str
-        or val_str.lower() in ["nan", "none", "nat", "null"]
-        or val_str.startswith("#")
-    ):
+    if not val_str or val_str.lower() in ["nan", "none", "nat", "null"] or val_str.startswith("#"):
         return None
 
     try:
@@ -356,27 +374,17 @@ def cargar_datos_gsheets():
 
             if header_idx is not None:
                 df_proceso = df_proceso_raw.iloc[header_idx + 1 :].copy()
-                df_proceso.columns = [
-                    str(c).strip() for c in df_proceso_raw.iloc[header_idx].values
-                ]
+                df_proceso.columns = [str(c).strip() for c in df_proceso_raw.iloc[header_idx].values]
             else:
                 df_proceso = df_proceso_raw.iloc[1:].copy()
-                df_proceso.columns = [
-                    str(c).strip() for c in df_proceso_raw.iloc[0].values
-                ]
+                df_proceso.columns = [str(c).strip() for c in df_proceso_raw.iloc[0].values]
 
         df_notas = pd.DataFrame()
         if df_notas_raw is not None and not df_notas_raw.empty:
             header_n_idx = None
             for idx, row in df_notas_raw.iterrows():
                 row_str = " ".join(row.dropna().astype(str)).upper()
-                if (
-                    "DESCRIPCIÓN" in row_str
-                    or "DESCRIPCION" in row_str
-                    or "PRIORIDA" in row_str
-                    or "TIPO" in row_str
-                    or "NOTA" in row_str
-                ):
+                if any(k in row_str for k in ["DESCRIPCIÓN", "DESCRIPCION", "PRIORIDA", "TIPO", "NOTA"]):
                     header_n_idx = idx
                     break
 
@@ -402,13 +410,9 @@ def render_dark_table(df_page):
     headers = list(df_page.columns)
 
     col_resp = next((c for c in headers if "RESP" in c.upper()), None)
-    col_cer = next(
-        (c for c in headers if "CER" in c.upper() and "FIRM" in c.upper()), None
-    )
+    col_cer = next((c for c in headers if "CER" in c.upper() and "FIRM" in c.upper()), None)
     col_env = next((c for c in headers if "ENV" in c.upper()), None)
-    col_crm_salida = next(
-        (c for c in headers if "CRM" in c.upper() and "SALIDA" in c.upper()), None
-    )
+    col_crm_salida = next((c for c in headers if "CRM" in c.upper() and "SALIDA" in c.upper()), None)
     col_orden = next((c for c in headers if "ORDEN" in c.upper()), None)
 
     html = '<div style="overflow-x: auto; border: 1px solid #1F2937; border-radius: 6px; background-color: #111827; margin-bottom: 4px;"><table style="width: 100%; border-collapse: collapse; color: #F3F4F6; font-size: 12.5px; text-align: left;"><thead><tr style="background-color: #1F2937; color: #9CA3AF; font-weight: 700; text-transform: uppercase; font-size: 11px; letter-spacing: 0.5px;">'
@@ -421,16 +425,8 @@ def render_dark_table(df_page):
     html += "</tr></thead><tbody>"
 
     for idx, row in df_page.iterrows():
-        cer_val = (
-            str(row[col_cer]).strip().upper()
-            if col_cer and pd.notna(row[col_cer])
-            else ""
-        )
-        crm_sal_val = (
-            str(row[col_crm_salida]).strip().upper()
-            if col_crm_salida and pd.notna(row[col_crm_salida])
-            else ""
-        )
+        cer_val = str(row[col_cer]).strip().upper() if col_cer and pd.notna(row[col_cer]) else ""
+        crm_sal_val = str(row[col_crm_salida]).strip().upper() if col_crm_salida and pd.notna(row[col_crm_salida]) else ""
 
         es_correccion = "CORREC" in cer_val
         cer_es_si = cer_val in ["SI", "SÍ"]
@@ -438,9 +434,7 @@ def render_dark_table(df_page):
         es_atascada = cer_es_si and crm_vacio
 
         if es_correccion:
-            tr_style = (
-                'style="border-bottom: 1px solid #EF4444;" class="row-correccion"'
-            )
+            tr_style = 'style="border-bottom: 1px solid #EF4444;" class="row-correccion"'
         elif es_atascada:
             tr_style = 'style="border-bottom: 1px solid #F59E0B; background-color: rgba(245, 158, 11, 0.08); border-left: 4px solid #F59E0B;"'
         else:
@@ -461,21 +455,9 @@ def render_dark_table(df_page):
             elif val_upper in ["SI", "SÍ"]:
                 badge = '<span style="background-color: rgba(16, 185, 129, 0.2); color: #A7F3D0; border: 1px solid #10B981; padding: 1px 6px; border-radius: 4px; font-weight: 700; font-size: 10.5px;">Si</span>'
             elif val != "":
-                if (
-                    "CORREC" in val_upper
-                    or "ERROR" in val_upper
-                    or "RECHAZ" in val_upper
-                    or "CANCEL" in val_upper
-                ):
+                if any(k in val_upper for k in ["CORREC", "ERROR", "RECHAZ", "CANCEL"]):
                     badge = f'<span style="background-color: rgba(239, 68, 68, 0.25); color: #FCA5A5; border: 1px solid #EF4444; padding: 1px 6px; border-radius: 4px; font-weight: 700; font-size: 10.5px;">{val} ⚠️</span>'
-                elif (
-                    h in [col_env, col_crm_salida, col_cer]
-                    or "APROBAC" in val_upper
-                    or "PENDIENTE" in val_upper
-                    or val_upper.startswith("P.")
-                    or "FIRMAR" in val_upper
-                    or "REVISAR" in val_upper
-                ):
+                elif h in [col_env, col_crm_salida, col_cer] or any(k in val_upper for k in ["APROBAC", "PENDIENTE", "P.", "FIRMAR", "REVISAR"]):
                     badge = f'<span style="background-color: rgba(245, 158, 11, 0.2); color: #FDE68A; border: 1px solid #F59E0B; padding: 1px 6px; border-radius: 4px; font-weight: 600; font-size: 10.5px;">{val}</span>'
                 else:
                     badge = val
@@ -489,17 +471,15 @@ def render_dark_table(df_page):
     return html
 
 
-# BITÁCORA CARD
-def render_bitacora_card(prioridad_val, descripcion_val, estado_val, elapsed_sec=0, is_ack=False):
-    prioridad = (
-        str(prioridad_val if pd.notna(prioridad_val) else "NORMAL").strip().upper()
-    )
-    descripcion = str(
-        descripcion_val if pd.notna(descripcion_val) else ""
-    ).strip()
+# ---------------------------------------------------------
+# RENDERIZADO TARJETA DE BITÁCORA CON RE-ESCALACIÓN Y PRE-AVISO
+# ---------------------------------------------------------
+def render_bitacora_card(prioridad_val, descripcion_val, estado_val, elapsed_sec=0, is_ack=False, cycle_num=1):
+    prioridad = str(prioridad_val if pd.notna(prioridad_val) else "NORMAL").strip().upper()
+    descripcion = str(descripcion_val if pd.notna(descripcion_val) else "").strip()
     
     if is_ack and prioridad == "URGENTE":
-        estado = "EN PROCESO"
+        estado = "EN ATENCIÓN"
     else:
         estado = str(estado_val if pd.notna(estado_val) else "PENDIENTE").strip().upper()
 
@@ -515,60 +495,83 @@ def render_bitacora_card(prioridad_val, descripcion_val, estado_val, elapsed_sec
     }
     border_color = priority_colors.get(prioridad, "#3B82F6")
 
-    status_styles = {
-        "PENDIENTE": {
-            "bg": "rgba(239, 68, 68, 0.2)",
-            "text": "#FCA5A5",
-            "border": "#EF4444",
-        },
-        "EN PROCESO": {
-            "bg": "rgba(245, 158, 11, 0.2)",
-            "text": "#FDE68A",
-            "border": "#F59E0B",
-        },
-        "COMPLETADO": {
-            "bg": "rgba(16, 185, 129, 0.2)",
-            "text": "#A7F3D0",
-            "border": "#10B981",
-        },
-    }
-    s_style = status_styles.get(
-        estado,
-        {"bg": "rgba(107, 114, 128, 0.2)", "text": "#E5E7EB", "border": "#9CA3AF"},
-    )
+    # SI ESTÁ ACK (ENTERADO) -> FORMATO COMPACTO Y SOBRIO
+    if is_ack and prioridad == "URGENTE":
+        return f'''
+        <div style="background: #0D1520; border: 1px solid #10B981; border-left: 4px solid #10B981; border-radius: 5px; padding: 5px 8px; margin-bottom: 3px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px;">
+                <div style="color: #E5E7EB; font-size: 11.5px; font-weight: 500; line-height: 1.2;">
+                    {descripcion}
+                </div>
+                <div style="background-color: rgba(16, 185, 129, 0.2); color: #A7F3D0; border: 1px solid #10B981; font-size: 9.5px; font-weight: 800; padding: 2px 6px; border-radius: 4px; white-space: nowrap;">
+                    ✓ RECIBIDO
+                </div>
+            </div>
+        </div>
+        '''
 
-    bar_html = ""
+    # SI ES URGENTE Y NO ATENDIDO -> MODO ALERTA DINÁMICO CICLICO
     if prioridad == "URGENTE":
         elapsed_sec = max(0, int(elapsed_sec))
-        mins = elapsed_sec // 60
-        secs = elapsed_sec % 60
-        time_formatted = f"{mins:02d}:{secs:02d}"
+        restante_sec = max(0, 600 - elapsed_sec)
+        
+        mins_r = restante_sec // 60
+        secs_r = restante_sec % 60
+        time_formatted = f"{mins_r:02d}:{secs_r:02d}"
         
         pct_bar = min(100, max(0, int((elapsed_sec / 600.0) * 100)))
         
-        if elapsed_sec < 300:
-            bar_color = "#10B981"
-            txt_t = f"⏱️ Transcurrido: {time_formatted}"
-        elif elapsed_sec < 600:
-            bar_color = "#F59E0B"
-            txt_t = f"⏱️ Transcurrido: {time_formatted}"
-        else:
+        # PRE-AVISO DE DISPARO (ÚLTIMOS 2 MINUTOS: > 480 SEG)
+        es_preaviso = elapsed_sec >= 480
+        card_class = "card-urgente-preaviso" if es_preaviso else "card-urgente-activa"
+        
+        if es_preaviso:
+            txt_t = f"🚨 ALARMA INMINENTE EN: {time_formatted}"
             bar_color = "#EF4444"
-            txt_t = f"🚨 {time_formatted} SIN ATENDER"
+        else:
+            txt_t = f"⏱️ Reinicio de alarma en: {time_formatted}"
+            bar_color = "#F59E0B" if elapsed_sec >= 300 else "#10B981"
 
-        bar_html = f"""
-        <div style="margin-top: 4px;">
-            <div style="display: flex; justify-content: space-between; align-items: center; font-size: 9.5px; color: {bar_color}; font-weight: 700; margin-bottom: 1px;">
-                <span>{txt_t}</span>
-                <span>{pct_bar}%</span>
+        reincidencia_tag = f"<b>AVISO #{cycle_num}</b>" if cycle_num == 1 else f"<b style='color:#FCA5A5;'>REINCIDENCIA #{cycle_num}</b>"
+
+        return f'''
+        <div class="{card_class}">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; margin-bottom: 3px;">
+                <div style="color: #FFFFFF; font-size: 12.5px; font-weight: 700; line-height: 1.25;">
+                    🚨 {descripcion}
+                </div>
+                <div style="background-color: rgba(239, 68, 68, 0.25); color: #FCA5A5; border: 1px solid #EF4444; font-size: 9.5px; font-weight: 800; padding: 2px 6px; border-radius: 4px; white-space: nowrap;">
+                    {reincidencia_tag}
+                </div>
             </div>
-            <div style="background-color: #1F2937; border-radius: 3px; height: 4px; width: 100%; overflow: hidden;">
-                <div style="background-color: {bar_color}; height: 100%; width: {pct_bar}%;"></div>
+            <div style="margin-top: 4px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; font-size: 9.5px; color: {bar_color}; font-weight: 700; margin-bottom: 1px;">
+                    <span>{txt_t}</span>
+                    <span>{pct_bar}%</span>
+                </div>
+                <div style="background-color: #1F2937; border-radius: 3px; height: 5px; width: 100%; overflow: hidden;">
+                    <div style="background-color: {bar_color}; height: 100%; width: {pct_bar}%;"></div>
+                </div>
             </div>
         </div>
-        """
+        '''
 
-    return f'<div style="background: #111827; border-left: 3px solid {border_color}; border-radius: 5px; padding: 5px 8px; margin-bottom: 3px;"><div style="display: flex; justify-content: space-between; align-items: center; gap: 8px;"><div style="color: #F3F4F6; font-size: 12px; font-weight: 500; line-height: 1.2; flex-grow: 1;">{descripcion}</div><div style="background-color: {s_style["bg"]}; color: {s_style["text"]}; border: 1px solid {s_style["border"]}; font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 6px; white-space: nowrap;">{estado}</div></div>{bar_html}</div>'
+    # FORMATO ESTÁNDAR OTRA PRIORIDAD
+    status_styles = {
+        "PENDIENTE": {"bg": "rgba(239, 68, 68, 0.2)", "text": "#FCA5A5", "border": "#EF4444"},
+        "EN PROCESO": {"bg": "rgba(245, 158, 11, 0.2)", "text": "#FDE68A", "border": "#F59E0B"},
+        "COMPLETADO": {"bg": "rgba(16, 185, 129, 0.2)", "text": "#A7F3D0", "border": "#10B981"},
+    }
+    s_style = status_styles.get(estado, {"bg": "rgba(107, 114, 128, 0.2)", "text": "#E5E7EB", "border": "#9CA3AF"})
+
+    return f'''
+    <div style="background: #111827; border-left: 3px solid {border_color}; border-radius: 5px; padding: 5px 8px; margin-bottom: 3px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px;">
+            <div style="color: #F3F4F6; font-size: 12px; font-weight: 500; line-height: 1.2;">{descripcion}</div>
+            <div style="background-color: {s_style["bg"]}; color: {s_style["text"]}; border: 1px solid {s_style["border"]}; font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 6px; white-space: nowrap;">{estado}</div>
+        </div>
+    </div>
+    '''
 
 
 # ---------------------------------------------------------
@@ -576,7 +579,6 @@ def render_bitacora_card(prioridad_val, descripcion_val, estado_val, elapsed_sec
 # ---------------------------------------------------------
 def borrar_busqueda():
     st.session_state.search_input = ""
-
 
 def toggle_sonido():
     st.session_state.sound_enabled = not st.session_state.sound_enabled
@@ -590,51 +592,66 @@ def render_tablero_fluido():
     df_main, df_bitacora, info_estado = cargar_datos_gsheets()
 
     activar_sonido_emergencia = False
-    
+    cant_urgencias_activas = 0
     urgent_elapsed_map = {}
+    
+    # ---------------------------------------------------------
+    # PROCESAMIENTO DE RE-ESCALACIÓN Y CICLOS DE 10 MINUTOS
+    # ---------------------------------------------------------
     if df_bitacora is not None and not df_bitacora.empty:
-        col_p = next(
-            (c for c in df_bitacora.columns if "PRIORI" in str(c).upper() or "PO" in str(c).upper() or "TIPO" in str(c).upper()), None
-        )
-        col_d = next(
-            (c for c in df_bitacora.columns if "DESCRIP" in str(c).upper() or "NOTA" in str(c).upper() or "AVISO" in str(c).upper()), None
-        )
+        col_p = next((c for c in df_bitacora.columns if any(k in str(c).upper() for k in ["PRIORI", "PO", "TIPO"])), None)
+        col_d = next((c for c in df_bitacora.columns if any(k in str(c).upper() for k in ["DESCRIP", "NOTA", "AVISO"])), None)
 
         if col_p and col_d:
             now_time = time.time()
             for idx_b, row in df_bitacora.iterrows():
                 prio_val = str(row[col_p]).strip().upper()
                 desc_val = str(row[col_d]).strip()
-                
                 note_key = f"{idx_b}_{desc_val}"
                 
                 if prio_val == "URGENTE" and desc_val:
+                    # Inicializar nota si es nueva
                     if note_key not in ESTADO_GLOBAL["urgent_start_times"]:
                         ESTADO_GLOBAL["urgent_start_times"][note_key] = now_time
-                        ESTADO_GLOBAL["urgent_sounded_stages"][note_key] = set()
+                        ESTADO_GLOBAL["urgent_cycles"][note_key] = 1
+                        ESTADO_GLOBAL["urgent_sound_triggered"][note_key] = False
 
                     start_t = ESTADO_GLOBAL["urgent_start_times"][note_key]
                     elapsed = max(0, now_time - start_t)
+
+                    # SI NO HA SIDO ATENDIDA -> EVALUAR CICLO
+                    if note_key not in ESTADO_GLOBAL["acknowledged_urgents"]:
+                        cant_urgencias_activas += 1
+                        
+                        # REINICIO AUTOMÁTICO DE 10 MINUTOS (600 SEGUNDOS)
+                        if elapsed >= 600:
+                            ESTADO_GLOBAL["urgent_start_times"][note_key] = now_time
+                            ESTADO_GLOBAL["urgent_cycles"][note_key] = ESTADO_GLOBAL["urgent_cycles"].get(note_key, 1) + 1
+                            ESTADO_GLOBAL["urgent_sound_triggered"][note_key] = False
+                            elapsed = 0
+
+                        # GATILLO DE SONIDO POR CADA CICLO
+                        if not ESTADO_GLOBAL["urgent_sound_triggered"].get(note_key, False):
+                            activar_sonido_emergencia = True
+                            ESTADO_GLOBAL["urgent_sound_triggered"][note_key] = True
+
                     urgent_elapsed_map[note_key] = elapsed
 
-                    if note_key in ESTADO_GLOBAL["acknowledged_urgents"]:
-                        continue
-
-                    sounded_set = ESTADO_GLOBAL["urgent_sounded_stages"].get(note_key, set())
-
-                    if 0 not in sounded_set:
-                        activar_sonido_emergencia = True
-                        sounded_set.add(0)
-                        ESTADO_GLOBAL["urgent_sounded_stages"][note_key] = sounded_set
-
-                    if elapsed >= 600 and 1 not in sounded_set:
-                        activar_sonido_emergencia = True
-                        sounded_set.add(1)
-                        ESTADO_GLOBAL["urgent_sounded_stages"][note_key] = sounded_set
-
-    # DISPARAR SONIDO SOLO SI ESTÁ ACTIVADO POR EL USUARIO
+    # DISPARAR SONIDO SI AUDIO ESTÁ HABILITADO
     if activar_sonido_emergencia and st.session_state.sound_enabled:
         reproducir_alarma_audio()
+
+    # BANNER FLOTANTE SUPERIOR SI HAY URGENCIAS PENDIENTES
+    if cant_urgencias_activas > 0:
+        st.markdown(
+            f'''
+            <div class="top-urgent-banner">
+                <span>🚨 ATENCIÓN INMEDIATA: Hay {cant_urgencias_activas} alerta(s) URGENTE(S) sin atender en la Bitácora.</span>
+                <span style="font-size: 11px; background: rgba(0,0,0,0.3); padding: 2px 8px; border-radius: 4px;">Atender abajo ⬇️</span>
+            </div>
+            ''',
+            unsafe_allow_html=True
+        )
 
     cols_deseadas = [
         "Fecha",
@@ -706,18 +723,7 @@ def render_tablero_fluido():
         if "Fecha" in df_vista.columns:
             df_vista["Fecha_Raw"] = df_vista["Fecha"].astype(str).str.strip()
             df_vista["Fecha_Raw"] = df_vista["Fecha_Raw"].replace(
-                [
-                    "",
-                    "nan",
-                    "none",
-                    "null",
-                    "nat",
-                    "NaN",
-                    "None",
-                    "#ERROR!",
-                    "#N/A",
-                    "#VALOR!",
-                ],
+                ["", "nan", "none", "null", "nat", "NaN", "None", "#ERROR!", "#N/A", "#VALOR!"],
                 np.nan,
             )
             df_vista["Fecha_Raw"] = df_vista["Fecha_Raw"].ffill()
@@ -726,11 +732,7 @@ def render_tablero_fluido():
         df_vista = df_vista[
             df_vista[col_ord_main].notna()
             & (df_vista[col_ord_main] != "")
-            & (
-                ~df_vista[col_ord_main]
-                .str.lower()
-                .isin(["nan", "none", "null", "nat", "#orden"])
-            )
+            & (~df_vista[col_ord_main].str.lower().isin(["nan", "none", "null", "nat", "#orden"]))
             & (~df_vista[col_ord_main].str.startswith("#"))
         ].copy()
 
@@ -803,32 +805,18 @@ def render_tablero_fluido():
                 by=["Fecha_dt", col_ord_main], ascending=[False, True]
             ).reset_index(drop=True)
 
-            df_vista = df_vista.drop(
-                columns=["Fecha_dt", "Fecha_Raw"], errors="ignore"
-            )
+            df_vista = df_vista.drop(columns=["Fecha_dt", "Fecha_Raw"], errors="ignore")
 
     # 1. KPIs SUPERIORES
     col1, col2, col3, col4 = st.columns(4)
     with col1:
-        st.markdown(
-            f'<div class="kpi-card"><div class="kpi-title">REGISTRADAS</div><div class="kpi-value">{total_reg}</div></div>',
-            unsafe_allow_html=True,
-        )
+        st.markdown(f'<div class="kpi-card"><div class="kpi-title">REGISTRADAS</div><div class="kpi-value">{total_reg}</div></div>', unsafe_allow_html=True)
     with col2:
-        st.markdown(
-            f'<div class="kpi-card"><div class="kpi-title">FIRMADAS ✏️</div><div class="kpi-value">{total_firm}</div></div>',
-            unsafe_allow_html=True,
-        )
+        st.markdown(f'<div class="kpi-card"><div class="kpi-title">FIRMADAS ✏️</div><div class="kpi-value">{total_firm}</div></div>', unsafe_allow_html=True)
     with col3:
-        st.markdown(
-            f'<div class="kpi-card"><div class="kpi-title">ENVIADAS 📦</div><div class="kpi-value">{total_env}</div></div>',
-            unsafe_allow_html=True,
-        )
+        st.markdown(f'<div class="kpi-card"><div class="kpi-title">ENVIADAS 📦</div><div class="kpi-value">{total_env}</div></div>', unsafe_allow_html=True)
     with col4:
-        st.markdown(
-            f'<div class="kpi-card"><div class="kpi-title">PENDIENTES ⌛</div><div class="kpi-value">{total_pend}</div></div>',
-            unsafe_allow_html=True,
-        )
+        st.markdown(f'<div class="kpi-card"><div class="kpi-title">PENDIENTES ⌛</div><div class="kpi-value">{total_pend}</div></div>', unsafe_allow_html=True)
 
     st.markdown("<div style='margin-bottom: 2px;'></div>", unsafe_allow_html=True)
 
@@ -873,7 +861,7 @@ def render_tablero_fluido():
                 st.session_state.page_index = 0
                 st.rerun()
 
-        # ÁREA DE BÚSQUEDA INTEGRADA CON X ROJA
+        # BUSCADOR CON BORRADO RÁPIDO
         with col_search_box:
             c_in, c_x = st.columns([0.84, 0.16])
             with c_in:
@@ -896,17 +884,12 @@ def render_tablero_fluido():
                 & (~df_vista[col_crm_f].astype(str).str.upper().isin(["SI", "SÍ"]))
             ]
         elif st.session_state.alert_filter == "CORRECCION" and col_cer_f:
-            df_vista = df_vista[
-                df_vista[col_cer_f].astype(str).str.upper().str.contains("CORREC", na=False)
-            ]
+            df_vista = df_vista[df_vista[col_cer_f].astype(str).str.upper().str.contains("CORREC", na=False)]
 
-        # FILTRADO DINÁMICO
         term_search = st.session_state.get("search_input", "").strip().lower()
         if term_search:
             col_target = "# Orden" if "# Orden" in df_vista.columns else df_vista.columns[0]
-            df_vista = df_vista[
-                df_vista[col_target].astype(str).str.lower().str.contains(term_search, na=False)
-            ]
+            df_vista = df_vista[df_vista[col_target].astype(str).str.lower().str.contains(term_search, na=False)]
 
         filas_por_pagina = 10
         total_filas = len(df_vista)
@@ -921,11 +904,7 @@ def render_tablero_fluido():
         df_pagina = df_vista.iloc[inicio:fin]
         cant_items_pagina = len(df_pagina)
 
-        if p_idx == 0:
-            duracion_base = 180
-        else:
-            duracion_base = max(15, int(60 * (cant_items_pagina / filas_por_pagina)))
-
+        duracion_base = 180 if p_idx == 0 else max(15, int(60 * (cant_items_pagina / filas_por_pagina)))
         duracion_total = duracion_base + st.session_state.get("manual_nav_bonus", 0)
 
         ahora = time.time()
@@ -964,10 +943,7 @@ def render_tablero_fluido():
     else:
         st.error(f"⚠️ {info_estado}")
 
-    st.markdown(
-        "<hr style='border-color: #1F2937; margin: 3px 0;'>",
-        unsafe_allow_html=True,
-    )
+    st.markdown("<hr style='border-color: #1F2937; margin: 3px 0;'>", unsafe_allow_html=True)
 
     # 3. SECCIÓN INFERIOR
     c_left, c_middle, c_right = st.columns([1.2, 1.1, 1.2])
@@ -1054,7 +1030,7 @@ def render_tablero_fluido():
         )
 
     with c_right:
-        # ENCABEZADO BITÁCORA + BOTÓN DE AUDIO DE ALTO CONTRASTE Y ENVOLTURA DEDICADA
+        # ENCABEZADO BITÁCORA + BOTÓN DE AUDIO HIGH-CONTRAST
         col_b1, col_b2 = st.columns([0.60, 0.40])
         with col_b1:
             st.markdown("<h4 style='margin:0 0 1px 0; font-size:13.5px; color:#F3F4F6;'>📌 Bitácora / Avisos</h4>", unsafe_allow_html=True)
@@ -1072,8 +1048,8 @@ def render_tablero_fluido():
         if df_bitacora is None or df_bitacora.empty:
             st.info("Sin avisos en 'NOTAS DEL DIA'.")
         else:
-            col_p = next((c for c in df_bitacora.columns if "PRIORI" in str(c).upper() or "PO" in str(c).upper() or "TIPO" in str(c).upper()), None)
-            col_d = next((c for c in df_bitacora.columns if "DESCRIP" in str(c).upper() or "NOTA" in str(c).upper() or "AVISO" in str(c).upper()), None)
+            col_p = next((c for c in df_bitacora.columns if any(k in str(c).upper() for k in ["PRIORI", "PO", "TIPO"])), None)
+            col_d = next((c for c in df_bitacora.columns if any(k in str(c).upper() for k in ["DESCRIP", "NOTA", "AVISO"])), None)
             col_e = next((c for c in df_bitacora.columns if "ESTADO" in str(c).upper()), None)
 
             if col_p and col_p in df_bitacora.columns:
@@ -1100,11 +1076,17 @@ def render_tablero_fluido():
                 note_key = f"{idx_b}_{d_val}"
                 elapsed_val = urgent_elapsed_map.get(note_key, 0)
                 is_ack = note_key in ESTADO_GLOBAL["acknowledged_urgents"]
+                cycle_num = ESTADO_GLOBAL["urgent_cycles"].get(note_key, 1)
                 
-                st.markdown(render_bitacora_card(p_val, d_val, e_val, elapsed_sec=elapsed_val, is_ack=is_ack), unsafe_allow_html=True)
+                st.markdown(
+                    render_bitacora_card(
+                        p_val, d_val, e_val, elapsed_sec=elapsed_val, is_ack=is_ack, cycle_num=cycle_num
+                    ),
+                    unsafe_allow_html=True,
+                )
                 
                 if str(p_val).strip().upper() == "URGENTE" and not is_ack:
-                    if st.button("✅ Enterado", key=f"btn_ack_{idx_b}"):
+                    if st.button(f"✅ Enterado (Detener Aviso #{cycle_num})", key=f"btn_ack_{idx_b}"):
                         ESTADO_GLOBAL["acknowledged_urgents"].add(note_key)
                         st.rerun()
 
