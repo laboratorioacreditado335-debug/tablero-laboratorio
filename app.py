@@ -135,6 +135,10 @@ if "manual_nav_bonus" not in st.session_state:
     st.session_state.manual_nav_bonus = 0
 if "last_alarm_id" not in st.session_state:
     st.session_state.last_alarm_id = None
+if "last_search_time" not in st.session_state:
+    st.session_state.last_search_time = time.time()
+if "last_search_val" not in st.session_state:
+    st.session_state.last_search_val = ""
 
 
 # ---------------------------------------------------------
@@ -650,6 +654,15 @@ def render_tablero_fluido():
                 st.rerun()
 
         with col_search:
+            ahora_search = time.time()
+            if st.session_state.get("search_term", ""):
+                if ahora_search - st.session_state.get("last_search_time", ahora_search) >= 180:
+                    st.session_state.search_term = ""
+                    st.session_state.last_search_val = ""
+                    if "search_input_widget" in st.session_state:
+                        st.session_state.search_input_widget = ""
+                    st.rerun()
+
             search_val = st.text_input(
                 "Buscar Orden",
                 value=st.session_state.get("search_term", ""),
@@ -657,7 +670,11 @@ def render_tablero_fluido():
                 key="search_input_widget",
                 label_visibility="collapsed",
             )
-            st.session_state.search_term = search_val
+
+            if search_val != st.session_state.get("last_search_val", ""):
+                st.session_state.last_search_val = search_val
+                st.session_state.last_search_time = time.time()
+                st.session_state.search_term = search_val
 
         if st.session_state.search_term.strip():
             term = st.session_state.search_term.strip().lower()
@@ -788,26 +805,29 @@ def render_tablero_fluido():
             col_d = next((c for c in df_bitacora.columns if "DESCRIP" in str(c).upper() or "NOTA" in str(c).upper() or "AVISO" in str(c).upper()), None)
             col_e = next((c for c in df_bitacora.columns if "ESTADO" in str(c).upper()), None)
 
+            # Ordenar bitácora por prioridad (URGENTE primero)
+            if col_p and col_p in df_bitacora.columns:
+                prio_map = {
+                    "URGENTE": 1,
+                    "REVISIÓN": 2,
+                    "REVISION": 2,
+                    "AVISO": 3,
+                    "MANTENIMIENTO": 4,
+                    "NORMAL": 5,
+                }
+                df_bitacora["_prio_sort"] = df_bitacora[col_p].apply(
+                    lambda x: prio_map.get(str(x).strip().upper(), 99)
+                )
+                df_bitacora = df_bitacora.sort_values(by="_prio_sort").drop(columns=["_prio_sort"])
+
             avisos_html = '<div style="display: flex; flex-direction: column; gap: 3px;">'
-            avisos_cont = 0
-            for _, row in df_bitacora.iterrows():
-                p_val = row[col_p] if col_p else "NORMAL"
-                d_val = row[col_d] if col_d else ""
-                e_val = row[col_e] if col_e else "PENDIENTE"
-
-                if (
-                    pd.notna(d_val)
-                    and str(d_val).strip() != ""
-                    and str(d_val).strip().lower() != "nan"
-                ):
-                    avisos_html += render_bitacora_card(p_val, d_val, e_val)
-                    avisos_cont += 1
-            avisos_html += "</div>"
-
-            if avisos_cont > 0:
-                st.markdown(avisos_html, unsafe_allow_html=True)
-            else:
-                st.info("No hay descripciones activas en la tabla de notas.")
+            for _, r in df_bitacora.iterrows():
+                p_val = r[col_p] if col_p else "NORMAL"
+                d_val = r[col_d] if col_d else ""
+                e_val = r[col_e] if col_e else "PENDIENTE"
+                avisos_html += render_bitacora_card(p_val, d_val, e_val)
+            avisos_html += '</div>'
+            st.markdown(avisos_html, unsafe_allow_html=True)
 
 
 render_tablero_fluido()
