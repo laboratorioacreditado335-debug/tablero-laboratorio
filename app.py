@@ -12,112 +12,13 @@ import streamlit.components.v1 as components
 SPREADSHEET_ID = "1CvPEtDspm7g3T7yXDluEUD7kGyWH5abNAP1nkalX6sI"
 
 # ---------------------------------------------------------
-# CONFIGURACIÓN DE PÁGINA Y ESTILOS MODO OSCURO
+# CONFIGURACIÓN DE PÁGINA
 # ---------------------------------------------------------
 st.set_page_config(
     page_title="Tablero de Control - Laboratorio", page_icon="📊", layout="wide"
 )
 
-st.markdown(
-    """
-<style>
-    /* OCULTAR ENCABEZADOS Y AJUSTAR CONTENEDOR PRINCIPAL */
-    header, [data-testid="stHeader"] { display: none !important; }
-    .block-container { 
-        padding-top: 0.2rem !important; 
-        padding-bottom: 0.2rem !important; 
-        padding-left: 1rem !important;
-        padding-right: 1rem !important;
-    }
-
-    .stApp { background-color: #0B1120; color: #F3F4F6; font-size: 14px; }
-    
-    /* TARJETAS KPI ESCALADAS */
-    .kpi-card {
-        background-color: #111827;
-        border: 1px solid #1F2937;
-        border-radius: 6px;
-        padding: 6px 10px;
-        text-align: center;
-        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.4);
-    }
-    .kpi-title {
-        color: #9CA3AF;
-        font-size: 11px;
-        font-weight: 700;
-        letter-spacing: 0.5px;
-        text-transform: uppercase;
-        margin-bottom: 1px;
-    }
-    .kpi-value { color: #FFFFFF; font-size: 22px; font-weight: 800; line-height: 1.1; }
-
-    /* TARJETAS DE PROGRESO DE ETAPA POR ÓRDEN (AJUSTADO "UN TRIS" MÁS COMPACTO) */
-    .progress-order-card {
-        background-color: #111827;
-        border: 1px solid #1F2937;
-        border-radius: 4px;
-        padding: 3px 6px;
-        margin-bottom: 2px;
-    }
-
-    /* CONTROLES Y BOTONES */
-    div.stButton > button {
-        background-color: #1E293B !important;
-        color: #38BDF8 !important;
-        border: 1px solid #3B82F6 !important;
-        border-radius: 5px !important;
-        font-weight: 700 !important;
-        font-size: 12.5px !important;
-        padding: 2px 8px !important;
-        width: 100% !important;
-        height: 34px !important;
-        transition: all 0.2s ease-in-out !important;
-    }
-    div.stButton > button:hover {
-        background-color: #2563EB !important;
-        color: #FFFFFF !important;
-        border-color: #60A5FA !important;
-        cursor: pointer !important;
-    }
-
-    /* CAMPO DE BÚSQUEDA */
-    div[data-baseweb="input"] {
-        background-color: #111827 !important;
-        border: 1px solid #3B82F6 !important;
-        border-radius: 5px !important;
-        height: 34px !important;
-    }
-    div[data-baseweb="input"] input {
-        color: #F3F4F6 !important;
-        font-size: 13px !important;
-        padding: 2px 8px !important;
-    }
-
-    /* ANIMACIÓN PARPADEO CORRECCIÓN */
-    @keyframes pulse-correccion {
-        0% { background-color: rgba(239, 68, 68, 0.12); }
-        50% { background-color: rgba(239, 68, 68, 0.30); }
-        100% { background-color: rgba(239, 68, 68, 0.12); }
-    }
-    .row-correccion {
-        animation: pulse-correccion 2.2s infinite !important;
-        border-left: 4px solid #EF4444 !important;
-    }
-
-    /* PERSONALIZACIÓN DE BARRAS DE DESPLAZAMIENTO (SCROLLBARS) */
-    ::-webkit-scrollbar { width: 6px; height: 6px; }
-    ::-webkit-scrollbar-track { background: #111827; border-radius: 4px; }
-    ::-webkit-scrollbar-thumb { background: #374151; border-radius: 4px; }
-    ::-webkit-scrollbar-thumb:hover { background: #3B82F6; }
-
-    #MainMenu {visibility: hidden;}
-    footer {visibility: hidden;}
-</style>
-""",
-    unsafe_allow_html=True,
-)
-
-# ESTADOS DE SESIÓN
+# ESTADOS DE SESIÓN INICIALES
 if "page_index" not in st.session_state:
     st.session_state.page_index = 0
 if "last_switch_time" not in st.session_state:
@@ -126,8 +27,6 @@ if "search_term" not in st.session_state:
     st.session_state.search_term = ""
 if "manual_nav_bonus" not in st.session_state:
     st.session_state.manual_nav_bonus = 0
-if "known_urgents" not in st.session_state:
-    st.session_state.known_urgents = None
 if "last_search_time" not in st.session_state:
     st.session_state.last_search_time = time.time()
 if "last_search_val" not in st.session_state:
@@ -141,6 +40,120 @@ if "prog_day_page" not in st.session_state:
     st.session_state.prog_day_page = 0
 if "prog_day_last_switch" not in st.session_state:
     st.session_state.prog_day_last_switch = time.time()
+
+# NUEVOS ESTADOS DE SESIÓN
+if "alert_filter" not in st.session_state:
+    st.session_state.alert_filter = "TODAS"
+if "modo_tv" not in st.session_state:
+    st.session_state.modo_tv = False
+
+
+# ---------------------------------------------------------
+# INYECCIÓN DINÁMICA DE CSS Y ESTILOS
+# ---------------------------------------------------------
+tv_scale = "1.15" if st.session_state.modo_tv else "1.0"
+font_scale = "15px" if st.session_state.modo_tv else "14px"
+kpi_val_scale = "26px" if st.session_state.modo_tv else "22px"
+
+st.markdown(
+    f"""
+<style>
+    /* OCULTAR ENCABEZADOS Y AJUSTAR CONTENEDOR PRINCIPAL */
+    header, [data-testid="stHeader"] {{ display: none !important; }}
+    .block-container {{ 
+        padding-top: 0.2rem !important; 
+        padding-bottom: 0.2rem !important; 
+        padding-left: 1rem !important;
+        padding-right: 1rem !important;
+        zoom: {tv_scale};
+    }}
+
+    .stApp {{ background-color: #0B1120; color: #F3F4F6; font-size: {font_scale}; }}
+    
+    /* TARJETAS KPI ESCALADAS */
+    .kpi-card {{
+        background-color: #111827;
+        border: 1px solid #1F2937;
+        border-radius: 6px;
+        padding: 6px 10px;
+        text-align: center;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.4);
+    }}
+    .kpi-title {{
+        color: #9CA3AF;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.5px;
+        text-transform: uppercase;
+        margin-bottom: 1px;
+    }}
+    .kpi-value {{ color: #FFFFFF; font-size: {kpi_val_scale}; font-weight: 800; line-height: 1.1; }}
+
+    /* TARJETAS DE PROGRESO DE ETAPA POR ÓRDEN (AJUSTADO COMPACTO) */
+    .progress-order-card {{
+        background-color: #111827;
+        border: 1px solid #1F2937;
+        border-radius: 4px;
+        padding: 3px 6px;
+        margin-bottom: 2px;
+    }}
+
+    /* CONTROLES Y BOTONES */
+    div.stButton > button {{
+        background-color: #1E293B !important;
+        color: #38BDF8 !important;
+        border: 1px solid #3B82F6 !important;
+        border-radius: 5px !important;
+        font-weight: 700 !important;
+        font-size: 12px !important;
+        padding: 2px 6px !important;
+        width: 100% !important;
+        height: 32px !important;
+        transition: all 0.2s ease-in-out !important;
+    }}
+    div.stButton > button:hover {{
+        background-color: #2563EB !important;
+        color: #FFFFFF !important;
+        border-color: #60A5FA !important;
+        cursor: pointer !important;
+    }}
+
+    /* CAMPO DE BÚSQUEDA */
+    div[data-baseweb="input"] {{
+        background-color: #111827 !important;
+        border: 1px solid #3B82F6 !important;
+        border-radius: 5px !important;
+        height: 32px !important;
+    }}
+    div[data-baseweb="input"] input {{
+        color: #F3F4F6 !important;
+        font-size: 13px !important;
+        padding: 2px 8px !important;
+    }}
+
+    /* ANIMACIÓN PARPADEO CORRECCIÓN */
+    @keyframes pulse-correccion {{
+        0% {{ background-color: rgba(239, 68, 68, 0.12); }}
+        50% {{ background-color: rgba(239, 68, 68, 0.30); }}
+        100% {{ background-color: rgba(239, 68, 68, 0.12); }}
+    }}
+    .row-correccion {{
+        animation: pulse-correccion 2.2s infinite !important;
+        border-left: 4px solid #EF4444 !important;
+    }}
+
+    /* SCROLLBARS */
+    ::-webkit-scrollbar {{ width: 6px; height: 6px; }}
+    ::-webkit-scrollbar-track {{ background: #111827; border-radius: 4px; }}
+    ::-webkit-scrollbar-thumb {{ background: #374151; border-radius: 4px; }}
+    ::-webkit-scrollbar-thumb:hover {{ background: #3B82F6; }}
+
+    #MainMenu {{visibility: hidden;}}
+    footer {{visibility: hidden;}}
+</style>
+""",
+    unsafe_allow_html=True,
+)
 
 
 # ---------------------------------------------------------
@@ -380,6 +393,7 @@ def render_dark_table(df_page):
     return html
 
 
+# BITÁCORA CON RELOJ EXACTO EN SEGUNDOS / MM:SS
 def render_bitacora_card(prioridad_val, descripcion_val, estado_val, is_ack=False):
     prioridad = (
         str(prioridad_val if pd.notna(prioridad_val) else "NORMAL").strip().upper()
@@ -411,11 +425,6 @@ def render_bitacora_card(prioridad_val, descripcion_val, estado_val, is_ack=Fals
             "text": "#FCA5A5",
             "border": "#EF4444",
         },
-        "PENDIEN": {
-            "bg": "rgba(239, 68, 68, 0.2)",
-            "text": "#FCA5A5",
-            "border": "#EF4444",
-        },
         "EN PROCESO": {
             "bg": "rgba(245, 158, 11, 0.2)",
             "text": "#FDE68A",
@@ -435,18 +444,23 @@ def render_bitacora_card(prioridad_val, descripcion_val, estado_val, is_ack=Fals
     bar_html = ""
     if prioridad == "URGENTE":
         start_t = st.session_state.urgent_start_times.get(descripcion, time.time())
-        elapsed_min = int((time.time() - start_t) // 60)
-        pct_bar = min(100, int((elapsed_min / 15.0) * 100))
+        elapsed_sec = int(time.time() - start_t)
         
-        if elapsed_min < 5:
+        mins = elapsed_sec // 60
+        secs = elapsed_sec % 60
+        time_formatted = f"{mins:02d}:{secs:02d}"
+        
+        pct_bar = min(100, int((elapsed_sec / 900.0) * 100)) # 15 minutos = 900s
+        
+        if elapsed_sec < 300: # < 5 min
             bar_color = "#10B981"
-            txt_t = f"⏱️ Hace {elapsed_min} min"
-        elif elapsed_min < 10:
+            txt_t = f"⏱️ Transcurrido: {time_formatted}"
+        elif elapsed_sec < 600: # < 10 min
             bar_color = "#F59E0B"
-            txt_t = f"⏱️ Hace {elapsed_min} min"
+            txt_t = f"⏱️ Transcurrido: {time_formatted}"
         else:
             bar_color = "#EF4444"
-            txt_t = f"🚨 {elapsed_min} min sin atender"
+            txt_t = f"🚨 {time_formatted} sin atender"
 
         bar_html = f"""
         <div style="margin-top: 4px;">
@@ -470,6 +484,7 @@ def render_bitacora_card(prioridad_val, descripcion_val, estado_val, is_ack=Fals
 def render_tablero_fluido():
     df_main, df_bitacora, info_estado = cargar_datos_gsheets()
 
+    # NOTIFICACIONES AUDIBLES REFORZADAS (SOLO SI NO ESTÁN ENTERADAS)
     urgentes_no_enteradas = []
     if df_bitacora is not None and not df_bitacora.empty:
         col_p = next(
@@ -487,62 +502,45 @@ def render_tablero_fluido():
                     if desc_val not in st.session_state.urgent_start_times:
                         st.session_state.urgent_start_times[desc_val] = time.time()
                     
+                    # Si NO está en enteradas, se agrega para activar alarma
                     if desc_val not in st.session_state.acknowledged_urgents:
                         urgentes_no_enteradas.append(desc_val)
 
+    # Si alguien ya presionó ENTERADO, urgentes_no_enteradas estará VACIÓ y NO sonará
     if urgentes_no_enteradas:
-        texto_alerta = " / ".join(urgentes_no_enteradas).replace("'", "\\'").replace("\n", " ")
         components.html(
             f"""
             <script>
             (function() {{
-                function sonarAlertaLoop() {{
+                function emitirAlertaSustentada() {{
                     try {{
                         var AudioContext = window.AudioContext || window.webkitAudioContext;
                         if (!AudioContext) return;
                         var ctx = new AudioContext();
                         if (ctx.state === 'suspended') {{ ctx.resume(); }}
 
-                        var tiempos = [0, 0.2, 0.4];
+                        var tiempos = [0, 0.18, 0.36];
                         tiempos.forEach(function(t) {{
                             var osc = ctx.createOscillator();
                             var gain = ctx.createGain();
                             osc.type = 'sawtooth';
-                            osc.frequency.setValueAtTime(980, ctx.currentTime + t);
+                            osc.frequency.setValueAtTime(880, ctx.currentTime + t);
                             gain.gain.setValueAtTime(0.3, ctx.currentTime + t);
-                            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + t + 0.15);
+                            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + t + 0.12);
                             osc.connect(gain);
                             gain.connect(ctx.destination);
                             osc.start(ctx.currentTime + t);
-                            osc.stop(ctx.currentTime + t + 0.15);
+                            osc.stop(ctx.currentTime + t + 0.12);
                         }});
                     }} catch(e) {{ console.log(e); }}
                 }}
-                sonarAlertaLoop();
+                emitirAlertaSustentada();
             }})();
             </script>
             """,
             height=0,
             width=0,
         )
-
-    components.html(
-        """
-        <script>
-        window.top.document.addEventListener('click', function() {
-            try {
-                var AudioContext = window.AudioContext || window.webkitAudioContext;
-                if (AudioContext) {
-                    var ctx = new AudioContext();
-                    ctx.resume();
-                }
-            } catch(e) {}
-        }, { once: true });
-        </script>
-        """,
-        height=0,
-        width=0,
-    )
 
     cols_deseadas = [
         "Fecha",
@@ -566,6 +564,8 @@ def render_tablero_fluido():
     total_firm = 0
     total_env = 0
     total_pend = 0
+    cant_atascadas = 0
+    cant_correcciones = 0
 
     if df_main is not None and not df_main.empty:
         mapa_cols = {}
@@ -673,6 +673,19 @@ def render_tablero_fluido():
                 )
             total_pend = max(0, total_reg - total_env)
 
+            # CÁLCULO DE CONTEOS DE ALERTAS RÁPIDAS
+            col_cer_check = next((c for c in df_vista.columns if "CER" in c.upper()), None)
+            col_crm_check = next((c for c in df_vista.columns if "CRM" in c.upper() and "SALIDA" in c.upper()), None)
+            
+            for _, r_m in df_vista.iterrows():
+                cer_m = str(r_m[col_cer_check]).strip().upper() if col_cer_check else ""
+                crm_m = str(r_m[col_crm_check]).strip().upper() if col_crm_check else ""
+                
+                if "CORREC" in cer_m:
+                    cant_correcciones += 1
+                elif cer_m in ["SI", "SÍ"] and crm_m not in ["SI", "SÍ"]:
+                    cant_atascadas += 1
+
             df_hoy = df_vista[df_vista["Fecha_dt"] == hoy_dt].copy()
 
             df_anteriores = df_vista[df_vista["Fecha_dt"] < hoy_dt].copy()
@@ -726,9 +739,11 @@ def render_tablero_fluido():
 
     st.markdown("<div style='margin-bottom: 2px;'></div>", unsafe_allow_html=True)
 
-    # 2. TABLA PRINCIPAL CON CONTROLES Y BUSCADOR
+    # 2. CONTROLES, FILTROS Y MODO TV
     if df_vista is not None and not df_vista.empty:
-        col_btn1, col_btn2, col_search, col_info = st.columns([0.8, 0.8, 2.0, 2.4])
+        col_btn1, col_btn2, col_f_todas, col_f_atasc, col_f_correc, col_search, col_tv, col_info = st.columns(
+            [0.6, 0.6, 0.8, 1.1, 1.1, 1.6, 0.8, 1.8]
+        )
 
         with col_btn1:
             if st.button("⬆️ Subir"):
@@ -742,6 +757,25 @@ def render_tablero_fluido():
                 st.session_state.page_index += 1
                 st.session_state.last_switch_time = time.time()
                 st.session_state.manual_nav_bonus = 30
+                st.rerun()
+
+        # BOTONES DE FILTRO RÁPIDO UN CLIC
+        with col_f_todas:
+            if st.button("📋 Todas", key="btn_f_todas"):
+                st.session_state.alert_filter = "TODAS"
+                st.session_state.page_index = 0
+                st.rerun()
+
+        with col_f_atasc:
+            if st.button(f"⚠️ Atascadas ({cant_atascadas})", key="btn_f_atasc"):
+                st.session_state.alert_filter = "ATASCADAS"
+                st.session_state.page_index = 0
+                st.rerun()
+
+        with col_f_correc:
+            if st.button(f"🚨 Corrección ({cant_correcciones})", key="btn_f_correc"):
+                st.session_state.alert_filter = "CORRECCION"
+                st.session_state.page_index = 0
                 st.rerun()
 
         with col_search:
@@ -767,6 +801,28 @@ def render_tablero_fluido():
                 st.session_state.last_search_time = time.time()
                 st.session_state.search_term = search_val
 
+        # BOTÓN TOGGLE MODO TV
+        with col_tv:
+            tv_label = "📺 TV ON" if st.session_state.modo_tv else "📺 TV OFF"
+            if st.button(tv_label, key="btn_toggle_tv"):
+                st.session_state.modo_tv = not st.session_state.modo_tv
+                st.rerun()
+
+        # APLICAR FILTROS DE ALERTAS
+        col_cer_f = next((c for c in df_vista.columns if "CER" in c.upper()), None)
+        col_crm_f = next((c for c in df_vista.columns if "CRM" in c.upper() and "SALIDA" in c.upper()), None)
+
+        if st.session_state.alert_filter == "ATASCADAS" and col_cer_f and col_crm_f:
+            df_vista = df_vista[
+                df_vista[col_cer_f].astype(str).str.upper().isin(["SI", "SÍ"])
+                & (~df_vista[col_crm_f].astype(str).str.upper().isin(["SI", "SÍ"]))
+            ]
+        elif st.session_state.alert_filter == "CORRECCION" and col_cer_f:
+            df_vista = df_vista[
+                df_vista[col_cer_f].astype(str).str.upper().str.contains("CORREC", na=False)
+            ]
+
+        # APLICAR BÚSQUEDA POR TEXTO
         if st.session_state.search_term.strip():
             term = st.session_state.search_term.strip().lower()
             col_target = "# Orden" if "# Orden" in df_vista.columns else df_vista.columns[0]
@@ -796,7 +852,7 @@ def render_tablero_fluido():
         duracion_total = duracion_base + st.session_state.get("manual_nav_bonus", 0)
 
         ahora = time.time()
-        tiempo_transcurrido = me_transcurrido = ahora - st.session_state.last_switch_time
+        tiempo_transcurrido = ahora - st.session_state.last_switch_time
 
         if tiempo_transcurrido >= duracion_total and total_paginas > 1:
             st.session_state.page_index = (st.session_state.page_index + 1) % total_paginas
@@ -807,17 +863,17 @@ def render_tablero_fluido():
         with col_info:
             segundos_restantes = max(0, int(duracion_total - tiempo_transcurrido))
             bonus_str = " (+30s manual)" if st.session_state.get("manual_nav_bonus", 0) > 0 else ""
+            f_active = f" | Filtro: {st.session_state.alert_filter}" if st.session_state.alert_filter != "TODAS" else ""
             st.caption(
-                f"Pág. {p_idx + 1}/{total_paginas} ({total_filas} reg.)"
+                f"Pág. {p_idx + 1}/{total_paginas} ({total_filas} reg.){f_active}"
                 f" | ⏱️ Rotación: {segundos_restantes}s{bonus_str}"
             )
 
         st.markdown(render_dark_table(df_pagina), unsafe_allow_html=True)
 
-        # BOTONES DE PAGINACIÓN PEGANITOS Y AGRUPADOS
+        # BOTONES DE PAGINACIÓN COMPACTOS
         if total_paginas > 1:
             num_btns = min(total_paginas, 12)
-            # Creamos columnas muy estrechas para los botones y dejamos el sobrante a la derecha
             col_widths = [0.04] * num_btns + [1.0 - (0.04 * num_btns)]
             btn_cols = st.columns(col_widths)
             for i in range(num_btns):
@@ -888,7 +944,6 @@ def render_tablero_fluido():
                 unsafe_allow_html=True,
             )
 
-            # DESPLEGADO REDUCIDO LIGERAMENTE ("UN TRIS") PARA NAVEGACIÓN SIN SCROLL
             html_progresos = '<div style="display: flex; flex-direction: column; gap: 2px;">'
             for ord_num, pct, txt_falta in progresos:
                 bar_color = "#10B981" if pct == 100 else ("#3B82F6" if pct >= 50 else "#F59E0B")
