@@ -338,44 +338,52 @@ st.markdown(
 )
 
 # ---------------------------------------------------------
-# REPRODUCTOR DE AUDIO ALARMA
+# REPRODUCTOR DE AUDIO ALARMA (OPTIMIZADO CON RESUME)
 # ---------------------------------------------------------
 def reproducir_alarma_audio():
     components.html(
         """
         <script>
         (function() {
-            try {
-                var AudioCtx = window.AudioContext || window.webkitAudioContext;
-                if (!AudioCtx) return;
-                var ctx = new AudioCtx();
-                
-                var now = ctx.currentTime;
-                var freqs = [880, 1200, 880, 1200, 1500];
-                
-                freqs.forEach(function(freq, i) {
-                    var t = now + (i * 0.14);
-                    var osc = ctx.createOscillator();
-                    var gain = ctx.createGain();
+            function sonar() {
+                try {
+                    var AudioCtx = window.AudioContext || window.webkitAudioContext;
+                    if (!AudioCtx) return;
+                    var ctx = new AudioCtx();
                     
-                    osc.type = 'sawtooth';
-                    osc.frequency.setValueAtTime(freq, t);
+                    if (ctx.state === 'suspended') {
+                        ctx.resume();
+                    }
                     
-                    gain.gain.setValueAtTime(0.35, t);
-                    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
+                    var now = ctx.currentTime;
+                    var freqs = [880, 1200, 880, 1200, 1500];
                     
-                    osc.connect(gain);
-                    gain.connect(ctx.destination);
-                    
-                    osc.start(t);
-                    osc.stop(t + 0.13);
-                });
-            } catch(e) { console.error("Error reproduciendo audio:", e); }
+                    freqs.forEach(function(freq, i) {
+                        var t = now + (i * 0.14);
+                        var osc = ctx.createOscillator();
+                        var gain = ctx.createGain();
+                        
+                        osc.type = 'sawtooth';
+                        osc.frequency.setValueAtTime(freq, t);
+                        
+                        gain.gain.setValueAtTime(0.4, t);
+                        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
+                        
+                        osc.connect(gain);
+                        gain.connect(ctx.destination);
+                        
+                        osc.start(t);
+                        osc.stop(t + 0.13);
+                    });
+                } catch(e) { console.error("Error reproduciendo audio:", e); }
+            }
+            sonar();
+            setTimeout(sonar, 250);
         })();
         </script>
         """,
-        height=0,
-        width=0,
+        height=1,
+        width=1,
     )
 
 
@@ -941,10 +949,12 @@ def render_tablero_fluido():
                 st.session_state.manual_nav_bonus = 30
                 st.rerun()
 
+        # AL PRESIONAR BOTONES DE FILTRO SE BORRA EL BUSCADOR
         with col_f_todas:
             lbl_todas = "📋 Todas" if st.session_state.alert_filter != "TODAS" else "▶ 📋 Todas"
             if st.button(lbl_todas, key="btn_f_todas"):
                 st.session_state.alert_filter = "TODAS"
+                st.session_state.search_input = ""  # Limpia el buscador
                 st.session_state.page_index = 0
                 st.rerun()
 
@@ -952,6 +962,7 @@ def render_tablero_fluido():
             lbl_atasc = f"⚠️ Atascadas ({cant_atascadas})" if st.session_state.alert_filter != "ATASCADAS" else f"▶ ⚠️ Atascadas ({cant_atascadas})"
             if st.button(lbl_atasc, key="btn_f_atasc"):
                 st.session_state.alert_filter = "ATASCADAS"
+                st.session_state.search_input = ""  # Limpia el buscador
                 st.session_state.page_index = 0
                 st.rerun()
 
@@ -959,6 +970,7 @@ def render_tablero_fluido():
             lbl_correc = f"🚨 Corrección ({cant_correcciones})" if st.session_state.alert_filter != "CORRECCION" else f"▶ 🚨 Corrección ({cant_correcciones})"
             if st.button(lbl_correc, key="btn_f_correc"):
                 st.session_state.alert_filter = "CORRECCION"
+                st.session_state.search_input = ""  # Limpia el buscador
                 st.session_state.page_index = 0
                 st.rerun()
 
@@ -1201,17 +1213,15 @@ def render_tablero_fluido():
                         "estado": "Pendiente",
                         "usuario_enterado": None,
                         "fecha_enterado": None,
-                        "last_sound_cycle": 0
+                        "last_sound_cycle": -1  # Marca para que el renderizador dispare el audio
                     }
                     ESTADO_GLOBAL["mensajes_bitacora"].insert(0, nuevo_msg)
-                    if prio_clean == "Urgente" and st.session_state.sound_enabled:
-                        reproducir_alarma_audio()
                     st.success("¡Novedad publicada correctamente!")
                     st.rerun()
                 else:
                     st.warning("Escriba el contenido antes de enviar.")
 
-        # FEED TIPO CHAT DE NOVEDADES CON RE-ESCALAMIENTO A 4 MINUTOS
+        # FEED TIPO CHAT DE NOVEDADES CON RE-ESCALAMIENTO Y DISPARO DE AUDIO
         st.markdown("<div class='chat-container'>", unsafe_allow_html=True)
         mensajes = ESTADO_GLOBAL.get("mensajes_bitacora", [])
 
@@ -1230,7 +1240,7 @@ def render_tablero_fluido():
                     c_sec = elapsed % 240
                     c_num = int(elapsed // 240)
 
-                    # Toca sonar alarma si entramos a un nuevo ciclo de 4 min
+                    # Disparar alarma cuando entra a un nuevo ciclo o es nuevo (-1)
                     if msg.get("last_sound_cycle", -1) < c_num:
                         msg["last_sound_cycle"] = c_num
                         if st.session_state.sound_enabled:
