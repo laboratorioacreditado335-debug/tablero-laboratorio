@@ -117,6 +117,7 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
+# ESTADOS DE SESIÓN
 if "page_index" not in st.session_state:
     st.session_state.page_index = 0
 if "last_switch_time" not in st.session_state:
@@ -131,6 +132,16 @@ if "last_search_time" not in st.session_state:
     st.session_state.last_search_time = time.time()
 if "last_search_val" not in st.session_state:
     st.session_state.last_search_val = ""
+
+# NUEVOS ESTADOS DE SESIÓN PARA LAS MODIFICACIONES SOLICITADAS
+if "acknowledged_urgents" not in st.session_state:
+    st.session_state.acknowledged_urgents = set()
+if "urgent_start_times" not in st.session_state:
+    st.session_state.urgent_start_times = {}
+if "prog_day_page" not in st.session_state:
+    st.session_state.prog_day_page = 0
+if "prog_day_last_switch" not in st.session_state:
+    st.session_state.prog_day_last_switch = time.time()
 
 
 # ---------------------------------------------------------
@@ -195,21 +206,31 @@ def parsear_fecha(val):
     return None
 
 
+# MODIFICACIÓN 4: DETALLE DEL PASO FALTANTE EN ÓRDENES
 def calcular_progreso_orden(row):
     progreso = 25
-
     cer = str(row.get("Cer firmado", row.get("CER FIRMADO", ""))).strip().upper()
     env = str(row.get("Enviado", row.get("ENVIADO", ""))).strip().upper()
     crm_sal = str(row.get("CRM salida", row.get("CRM SALIDA", ""))).strip().upper()
 
+    faltantes = []
     if cer in ["SI", "SÍ"]:
         progreso += 25
+    else:
+        faltantes.append("CER Firmado")
+
     if env in ["SI", "SÍ"]:
         progreso += 25
+    else:
+        faltantes.append("Enviado")
+
     if crm_sal in ["SI", "SÍ"]:
         progreso += 25
+    else:
+        faltantes.append("CRM Salida")
 
-    return min(100, progreso)
+    texto_falta = f"Falta: {', '.join(faltantes)}" if faltantes else "¡Completo! 🎉"
+    return min(100, progreso), texto_falta
 
 
 def cargar_datos_gsheets():
@@ -361,18 +382,19 @@ def render_dark_table(df_page):
     return html
 
 
-def render_bitacora_card(prioridad_val, descripcion_val, estado_val):
+# MODIFICACIÓN 3: TARJETA DE BITÁCORA CON BARRA DINÁMICA DE TIEMPO
+def render_bitacora_card(prioridad_val, descripcion_val, estado_val, is_ack=False):
     prioridad = (
-        str(prioridad_val if pd.notna(prioridad_val) else "NORMAL")
-        .strip()
-        .upper()
+        str(prioridad_val if pd.notna(prioridad_val) else "NORMAL").strip().upper()
     )
     descripcion = str(
         descripcion_val if pd.notna(descripcion_val) else ""
     ).strip()
-    estado = (
-        str(estado_val if pd.notna(estado_val) else "PENDIENTE").strip().upper()
-    )
+    
+    if is_ack and prioridad == "URGENTE":
+        estado = "EN PROCESO"
+    else:
+        estado = str(estado_val if pd.notna(estado_val) else "PENDIENTE").strip().upper()
 
     priority_colors = {
         "URGENTE": "#EF4444",
@@ -413,7 +435,36 @@ def render_bitacora_card(prioridad_val, descripcion_val, estado_val):
         {"bg": "rgba(107, 114, 128, 0.2)", "text": "#E5E7EB", "border": "#9CA3AF"},
     )
 
-    return f'<div style="background: #111827; border-left: 3px solid {border_color}; border-radius: 5px; padding: 5px 8px; margin-bottom: 3px; display: flex; justify-content: space-between; align-items: center; gap: 8px;"><div style="color: #F3F4F6; font-size: 12px; font-weight: 500; line-height: 1.2; flex-grow: 1;">{descripcion}</div><div style="background-color: {s_style["bg"]}; color: {s_style["text"]}; border: 1px solid {s_style["border"]}; font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 6px; white-space: nowrap;">{estado}</div></div>'
+    # BARRA VIVA DE TIEMPO SI ES URGENTE
+    bar_html = ""
+    if prioridad == "URGENTE":
+        start_t = st.session_state.urgent_start_times.get(descripcion, time.time())
+        elapsed_min = int((time.time() - start_t) // 60)
+        pct_bar = min(100, int((elapsed_min / 15.0) * 100))
+        
+        if elapsed_min < 5:
+            bar_color = "#10B981"
+            txt_t = f"⏱️ Hace {elapsed_min} min"
+        elif elapsed_min < 10:
+            bar_color = "#F59E0B"
+            txt_t = f"⏱️ Hace {elapsed_min} min"
+        else:
+            bar_color = "#EF4444"
+            txt_t = f"🚨 {elapsed_min} min sin atender"
+
+        bar_html = f"""
+        <div style="margin-top: 4px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; font-size: 9.5px; color: {bar_color}; font-weight: 700; margin-bottom: 1px;">
+                <span>{txt_t}</span>
+                <span>{pct_bar}%</span>
+            </div>
+            <div style="background-color: #1F2937; border-radius: 3px; height: 4px; width: 100%; overflow: hidden;">
+                <div style="background-color: {bar_color}; height: 100%; width: {pct_bar}%;"></div>
+            </div>
+        </div>
+        """
+
+    return f'<div style="background: #111827; border-left: 3px solid {border_color}; border-radius: 5px; padding: 5px 8px; margin-bottom: 3px;"><div style="display: flex; justify-content: space-between; align-items: center; gap: 8px;"><div style="color: #F3F4F6; font-size: 12px; font-weight: 500; line-height: 1.2; flex-grow: 1;">{descripcion}</div><div style="background-color: {s_style["bg"]}; color: {s_style["text"]}; border: 1px solid {s_style["border"]}; font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 6px; white-space: nowrap;">{estado}</div></div>{bar_html}</div>'
 
 
 # ---------------------------------------------------------
@@ -423,30 +474,14 @@ def render_bitacora_card(prioridad_val, descripcion_val, estado_val):
 def render_tablero_fluido():
     df_main, df_bitacora, info_estado = cargar_datos_gsheets()
 
-    # ---------------------------------------------------------
-    # DETECCION AUTOMATICA DE NUEVAS NOTAS 'URGENTE'
-    # ---------------------------------------------------------
-    urgentes_actuales = set()
+    # DETECCION Y CONTROL DE TIEMPO PARA NOTAS 'URGENTE'
+    urgentes_no_enteradas = []
     if df_bitacora is not None and not df_bitacora.empty:
         col_p = next(
-            (
-                c
-                for c in df_bitacora.columns
-                if "PRIORI" in str(c).upper()
-                or "PO" in str(c).upper()
-                or "TIPO" in str(c).upper()
-            ),
-            None,
+            (c for c in df_bitacora.columns if "PRIORI" in str(c).upper() or "PO" in str(c).upper() or "TIPO" in str(c).upper()), None
         )
         col_d = next(
-            (
-                c
-                for c in df_bitacora.columns
-                if "DESCRIP" in str(c).upper()
-                or "NOTA" in str(c).upper()
-                or "AVISO" in str(c).upper()
-            ),
-            None,
+            (c for c in df_bitacora.columns if "DESCRIP" in str(c).upper() or "NOTA" in str(c).upper() or "AVISO" in str(c).upper()), None
         )
 
         if col_p and col_d:
@@ -454,58 +489,43 @@ def render_tablero_fluido():
                 prio_val = str(row[col_p]).strip().upper()
                 desc_val = str(row[col_d]).strip()
                 if prio_val == "URGENTE" and desc_val:
-                    urgentes_actuales.add(desc_val)
+                    if desc_val not in st.session_state.urgent_start_times:
+                        st.session_state.urgent_start_times[desc_val] = time.time()
+                    
+                    # SI NO SE HA DADO CLICK EN "ENTERADO", SIGUE PENDIENTE DE ALARMA
+                    if desc_val not in st.session_state.acknowledged_urgents:
+                        urgentes_no_enteradas.append(desc_val)
 
-    reproducir_sonido = False
-    texto_alerta = ""
-
-    if st.session_state.known_urgents is None:
-        st.session_state.known_urgents = urgentes_actuales
-    else:
-        nuevos_urgentes = urgentes_actuales - st.session_state.known_urgents
-        if nuevos_urgentes:
-            reproducir_sonido = True
-            texto_alerta = " / ".join(list(nuevos_urgentes))
-            st.session_state.known_urgents = urgentes_actuales
-
-    # DISPARADOR DE AUDIO SILENCIOSO E INVISIBLE (REPETICIÓN 4 PULSOS DE ALARMA)
-    if reproducir_sonido:
-        texto_clean = texto_alerta.replace("'", "\\'").replace("\n", " ")
+    # MODIFICACIÓN 2: ALARMA CONTINUA MIENTRAS EXISTAN NOTAS SIN DARSES 'ENTERADO'
+    if urgentes_no_enteradas:
+        texto_alerta = " / ".join(urgentes_no_enteradas).replace("'", "\\'").replace("\n", " ")
         components.html(
             f"""
             <script>
             (function() {{
-                function sonarAlertaRepetida() {{
+                function sonarAlertaLoop() {{
                     try {{
                         var AudioContext = window.AudioContext || window.webkitAudioContext;
                         if (!AudioContext) return;
                         var ctx = new AudioContext();
                         if (ctx.state === 'suspended') {{ ctx.resume(); }}
 
-                        var tiempos = [0, 0.25, 0.5, 0.75];
+                        var tiempos = [0, 0.2, 0.4];
                         tiempos.forEach(function(t) {{
                             var osc = ctx.createOscillator();
                             var gain = ctx.createGain();
                             osc.type = 'sawtooth';
-                            osc.frequency.setValueAtTime(950, ctx.currentTime + t);
-                            gain.gain.setValueAtTime(0.4, ctx.currentTime + t);
-                            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + t + 0.18);
+                            osc.frequency.setValueAtTime(980, ctx.currentTime + t);
+                            gain.gain.setValueAtTime(0.3, ctx.currentTime + t);
+                            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + t + 0.15);
                             osc.connect(gain);
                             gain.connect(ctx.destination);
                             osc.start(ctx.currentTime + t);
-                            osc.stop(ctx.currentTime + t + 0.18);
+                            osc.stop(ctx.currentTime + t + 0.15);
                         }});
                     }} catch(e) {{ console.log(e); }}
                 }}
-
-                sonarAlertaRepetida();
-
-                if ("Notification" in window && Notification.permission === "granted") {{
-                    new Notification("🚨 NOTA URGENTE EN BITÁCORA", {{
-                        body: "{texto_clean}",
-                        icon: "https://cdn-icons-png.flaticon.com/512/1827/1827349.png"
-                    }});
-                }}
+                sonarAlertaLoop();
             }})();
             </script>
             """,
@@ -513,7 +533,7 @@ def render_tablero_fluido():
             width=0,
         )
 
-    # UNLOCKER DE AUDIO INVISIBLE GLOBAL (ACTIVACIÓN AUTOMÁTICA AL TOCAR LA PÁGINA)
+    # UNLOCKER DE AUDIO INVISIBLE GLOBAL
     components.html(
         """
         <script>
@@ -544,6 +564,7 @@ def render_tablero_fluido():
     ]
     df_vista = pd.DataFrame()
     df_hoy = pd.DataFrame()
+    df_anteriores_incompletas = pd.DataFrame()
 
     total_hoy = 0
     hoy_dt = datetime.now().date()
@@ -661,6 +682,16 @@ def render_tablero_fluido():
             total_pend = max(0, total_reg - total_env)
 
             df_hoy = df_vista[df_vista["Fecha_dt"] == hoy_dt].copy()
+
+            # BÚSQUEDA DE INCOMPLETAS ANTERIORES PARA LA PÁGINA 2 RELÁMPAGO
+            df_anteriores = df_vista[df_vista["Fecha_dt"] < hoy_dt].copy()
+            incompletas_list = []
+            for _, r_ant in df_anteriores.iterrows():
+                pct_ant, _ = calcular_progreso_orden(r_ant)
+                if pct_ant < 100:
+                    incompletas_list.append(r_ant)
+            if incompletas_list:
+                df_anteriores_incompletas = pd.DataFrame(incompletas_list)
 
             if df_hoy.empty and not df_vista["Fecha_dt"].dropna().empty:
                 max_dt = df_vista["Fecha_dt"].dropna().max()
@@ -792,6 +823,18 @@ def render_tablero_fluido():
 
         st.markdown(render_dark_table(df_pagina), unsafe_allow_html=True)
 
+        # MODIFICACIÓN 1: DESPLAZAMIENTO RÁPIDO CON NÚMEROS DE PÁGINA
+        if total_paginas > 1:
+            btn_cols = st.columns(min(total_paginas, 12))
+            for i in range(min(total_paginas, 12)):
+                with btn_cols[i]:
+                    label = f"• {i+1} •" if i == st.session_state.page_index else f"{i+1}"
+                    if st.button(label, key=f"num_page_btn_{i}"):
+                        st.session_state.page_index = i
+                        st.session_state.last_switch_time = time.time()
+                        st.session_state.manual_nav_bonus = 30
+                        st.rerun()
+
     else:
         st.error(f"⚠️ {info_estado}")
 
@@ -804,16 +847,37 @@ def render_tablero_fluido():
     c_left, c_middle, c_right = st.columns([1.2, 1.1, 1.2])
 
     with c_left:
+        # MODIFICACIÓN 5: PÁGINA 2 RELÁMPAGO (5s) PARA INCOMPLETAS ANTERIORES
+        has_anteriores_inc = not df_anteriores_incompletas.empty
+        now_p = time.time()
+        dt_p = now_p - st.session_state.prog_day_last_switch
+
+        if has_anteriores_inc:
+            if st.session_state.prog_day_page == 0 and dt_p >= 20:  # 20s en Hoy
+                st.session_state.prog_day_page = 1
+                st.session_state.prog_day_last_switch = now_p
+            elif st.session_state.prog_day_page == 1 and dt_p >= 5: # 5s relámpago en Incompletas
+                st.session_state.prog_day_page = 0
+                st.session_state.prog_day_last_switch = now_p
+
+        if st.session_state.prog_day_page == 1 and has_anteriores_inc:
+            df_prog_render = df_anteriores_incompletas
+            sub_caption = f"⚠️ **Pág 2/2:** Incompletas Anteriores (Vista 5s)"
+        else:
+            st.session_state.prog_day_page = 0
+            df_prog_render = df_hoy
+            sub_caption = f"🗓️ **Pág 1/2:** Hoy ({fecha_activa_str}) | {total_hoy} órdenes"
+
         st.markdown("<h4 style='margin:0 0 1px 0; font-size:13.5px; color:#F3F4F6;'>🚚 Programados del Día</h4>", unsafe_allow_html=True)
-        st.caption(f"🗓️ Fecha: **{fecha_activa_str}** | {total_hoy} órdenes")
+        st.caption(sub_caption)
         
         progresos = []
-        if df_hoy is not None and not df_hoy.empty:
-            for _, r in df_hoy.iterrows():
+        if df_prog_render is not None and not df_prog_render.empty:
+            for _, r in df_prog_render.iterrows():
                 ord_num = limpiar_texto(r.get('# Orden', ''))
                 if ord_num:
-                    pct = calcular_progreso_orden(r)
-                    progresos.append((ord_num, pct))
+                    pct, txt_falta = calcular_progreso_orden(r)
+                    progresos.append((ord_num, pct, txt_falta))
 
         if progresos:
             acumulado_general = int(np.mean([p[1] for p in progresos]))
@@ -821,7 +885,7 @@ def render_tablero_fluido():
             st.markdown(
                 f'<div style="background-color: #111827; border: 1px solid #1F2937; border-radius: 5px; padding: 4px 8px; margin-bottom: 4px;">'
                 f'<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px;">'
-                f'<span style="font-size: 10.5px; font-weight: 700; color: #9CA3AF;">PROMEDIO DÍA</span>'
+                f'<span style="font-size: 10.5px; font-weight: 700; color: #9CA3AF;">PROMEDIO VISTA</span>'
                 f'<span style="font-size: 12.5px; font-weight: 800; color: #38BDF8;">{acumulado_general}%</span>'
                 f'</div>'
                 f'<div style="background-color: #1F2937; border-radius: 4px; height: 6px; width: 100%; overflow: hidden;">'
@@ -831,9 +895,9 @@ def render_tablero_fluido():
                 unsafe_allow_html=True,
             )
 
-            # MOSTRAR COMPLETO SIN CORTE NI SCROLLBAR
+            # MODIFICACIÓN 4: DESPLEGADO COMPLETO Y DETALLE DE PASO FALTANTE
             html_progresos = '<div style="display: flex; flex-direction: column; gap: 3px;">'
-            for ord_num, pct in progresos:
+            for ord_num, pct, txt_falta in progresos:
                 bar_color = "#10B981" if pct == 100 else ("#3B82F6" if pct >= 50 else "#F59E0B")
                 html_progresos += (
                     f'<div class="progress-order-card">'
@@ -841,15 +905,16 @@ def render_tablero_fluido():
                     f'<span style="font-size: 11.5px; font-weight: 700; color: #F3F4F6;">📦 Orden #{ord_num}</span>'
                     f'<span style="font-size: 11px; font-weight: 800; color: {bar_color};">{pct}%</span>'
                     f'</div>'
-                    f'<div style="background-color: #1F2937; border-radius: 3px; height: 5px; width: 100%; overflow: hidden;">'
+                    f'<div style="background-color: #1F2937; border-radius: 3px; height: 5px; width: 100%; overflow: hidden; margin-bottom: 2px;">'
                     f'<div style="background-color: {bar_color}; height: 100%; width: {pct}%;"></div>'
                     f'</div>'
+                    f'<div style="font-size: 9.5px; color: #9CA3AF; font-weight: 600;">{txt_falta}</div>'
                     f'</div>'
                 )
             html_progresos += '</div>'
             st.markdown(html_progresos, unsafe_allow_html=True)
         else:
-            st.info(f"Sin órdenes programadas hoy ({fecha_activa_str}).")
+            st.info("Sin órdenes en esta vista.")
 
     with c_middle:
         st.markdown("<h4 style='margin:0 0 1px 0; font-size:13.5px; color:#F3F4F6;'>📋 Asignaciones del Día</h4>", unsafe_allow_html=True)
@@ -891,14 +956,21 @@ def render_tablero_fluido():
                 )
                 df_bitacora = df_bitacora.sort_values(by="_prio_sort").drop(columns=["_prio_sort"])
 
-            avisos_html = '<div style="display: flex; flex-direction: column; gap: 3px; max-height: 240px; overflow-y: auto; padding-right: 4px;">'
-            for _, r in df_bitacora.iterrows():
+            # RENDERIZADO CON BOTÓN 'ENTERADO' Y BARRAS VIVAS DE TIEMPO
+            for idx_b, r in df_bitacora.iterrows():
                 p_val = r[col_p] if col_p else "NORMAL"
-                d_val = r[col_d] if col_d else ""
+                d_val = str(r[col_d] if col_d else "").strip()
                 e_val = r[col_e] if col_e else "PENDIENTE"
-                avisos_html += render_bitacora_card(p_val, d_val, e_val)
-            avisos_html += '</div>'
-            st.markdown(avisos_html, unsafe_allow_html=True)
+                
+                is_ack = d_val in st.session_state.acknowledged_urgents
+                
+                st.markdown(render_bitacora_card(p_val, d_val, e_val, is_ack=is_ack), unsafe_allow_html=True)
+                
+                # MODIFICACIÓN 2: BOTÓN ENTERADO SILENCIADOR
+                if str(p_val).strip().upper() == "URGENTE" and not is_ack:
+                    if st.button("✅ Enterado", key=f"btn_ack_{idx_b}"):
+                        st.session_state.acknowledged_urgents.add(d_val)
+                        st.rerun()
 
 
 render_tablero_fluido()
