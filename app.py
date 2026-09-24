@@ -18,7 +18,20 @@ st.set_page_config(
     page_title="Tablero de Control - Laboratorio", page_icon="📊", layout="wide"
 )
 
-# ESTADOS DE SESIÓN INICIALES
+# ---------------------------------------------------------
+# ESTADO GLOBAL COMPARTIDO ENTRE TODOS LOS PC (SERVIDOR)
+# ---------------------------------------------------------
+@st.cache_resource
+def obtener_estado_global():
+    return {
+        "urgent_start_times": {},
+        "acknowledged_urgents": set(),
+        "urgent_sounded_stages": {},
+    }
+
+ESTADO_GLOBAL = obtener_estado_global()
+
+# ESTADOS DE SESIÓN LOCALES (Navegación individual por pestaña)
 if "page_index" not in st.session_state:
     st.session_state.page_index = 0
 if "last_switch_time" not in st.session_state:
@@ -31,14 +44,6 @@ if "last_search_time" not in st.session_state:
     st.session_state.last_search_time = time.time()
 if "last_search_val" not in st.session_state:
     st.session_state.last_search_val = ""
-
-if "acknowledged_urgents" not in st.session_state:
-    st.session_state.acknowledged_urgents = set()
-if "urgent_start_times" not in st.session_state:
-    st.session_state.urgent_start_times = {}
-if "urgent_sounded_stages" not in st.session_state:
-    # Registra las etapas que ya sonaron para cada nota: 0 (al inicio), 1 (a los 10 min)
-    st.session_state.urgent_sounded_stages = {}
 
 if "prog_day_page" not in st.session_state:
     st.session_state.prog_day_page = 0
@@ -176,6 +181,32 @@ st.markdown(
 </style>
 """,
     unsafe_allow_html=True,
+)
+
+# ACTIVADOR SILENCIOSO DE PERMISO DE AUDIO AL PRIMER CLIC
+components.html(
+    """
+    <script>
+    (function() {
+        if (!window.parent._audioUnlocked) {
+            const unlock = function() {
+                try {
+                    var AudioContext = window.AudioContext || window.webkitAudioContext;
+                    if (AudioContext) {
+                        var ctx = new AudioContext();
+                        if (ctx.state === 'suspended') { ctx.resume(); }
+                    }
+                    window.parent._audioUnlocked = true;
+                } catch(e) {}
+            };
+            window.parent.document.addEventListener('click', unlock, { once: true });
+            window.parent.document.addEventListener('keydown', unlock, { once: true });
+        }
+    })();
+    </script>
+    """,
+    height=0,
+    width=0,
 )
 
 
@@ -416,7 +447,7 @@ def render_dark_table(df_page):
     return html
 
 
-# BITÁCORA CON CONTRARRELOJ EXACTO EN MM:SS Y SEGUNDOS
+# BITÁCORA SINCRONIZADA EN TIEMPO REAL CON ESTADO GLOBAL
 def render_bitacora_card(prioridad_val, descripcion_val, estado_val, is_ack=False):
     prioridad = (
         str(prioridad_val if pd.notna(prioridad_val) else "NORMAL").strip().upper()
@@ -466,7 +497,7 @@ def render_bitacora_card(prioridad_val, descripcion_val, estado_val, is_ack=Fals
 
     bar_html = ""
     if prioridad == "URGENTE":
-        start_t = st.session_state.urgent_start_times.get(descripcion, time.time())
+        start_t = ESTADO_GLOBAL["urgent_start_times"].get(descripcion, time.time())
         elapsed_sec = int(time.time() - start_t)
         
         mins = elapsed_sec // 60
@@ -525,32 +556,32 @@ def render_tablero_fluido():
                 desc_val = str(row[col_d]).strip()
                 
                 if prio_val == "URGENTE" and desc_val:
-                    # Si ya le dieron ENTERADO, NUNCA más suena
-                    if desc_val in st.session_state.acknowledged_urgents:
+                    # Si YA le dieron 'Enterado' en CUALQUIER PC, no suena
+                    if desc_val in ESTADO_GLOBAL["acknowledged_urgents"]:
                         continue
                     
-                    # Registrar tiempo inicial
-                    if desc_val not in st.session_state.urgent_start_times:
-                        st.session_state.urgent_start_times[desc_val] = now_time
-                        st.session_state.urgent_sounded_stages[desc_val] = set()
+                    # Registrar tiempo inicial compartida globalmente entre computadores
+                    if desc_val not in ESTADO_GLOBAL["urgent_start_times"]:
+                        ESTADO_GLOBAL["urgent_start_times"][desc_val] = now_time
+                        ESTADO_GLOBAL["urgent_sounded_stages"][desc_val] = set()
 
-                    start_t = st.session_state.urgent_start_times[desc_val]
+                    start_t = ESTADO_GLOBAL["urgent_start_times"][desc_val]
                     elapsed = now_time - start_t
-                    sounded_set = st.session_state.urgent_sounded_stages.get(desc_val, set())
+                    sounded_set = ESTADO_GLOBAL["urgent_sounded_stages"].get(desc_val, set())
 
                     # ETAPA 0: Al surgir por primera vez (Inicio)
                     if 0 not in sounded_set:
                         activar_sonido_emergencia = True
                         sounded_set.add(0)
-                        st.session_state.urgent_sounded_stages[desc_val] = sounded_set
+                        ESTADO_GLOBAL["urgent_sounded_stages"][desc_val] = sounded_set
 
                     # ETAPA 1: Al pasar o superar los 10 minutos (>= 600 segundos)
                     if elapsed >= 600 and 1 not in sounded_set:
                         activar_sonido_emergencia = True
                         sounded_set.add(1)
-                        st.session_state.urgent_sounded_stages[desc_val] = sounded_set
+                        ESTADO_GLOBAL["urgent_sounded_stages"][desc_val] = sounded_set
 
-    # EMISIÓN DE SONIDO VÍA WEB AUDIO API (SI CORRESPONDE)
+    # EMISIÓN DE SONIDO VÍA WEB AUDIO API
     if activar_sonido_emergencia:
         components.html(
             """
@@ -563,7 +594,6 @@ def render_tablero_fluido():
                         var ctx = new AudioContext();
                         if (ctx.state === 'suspended') { ctx.resume(); }
 
-                        // Tono potente de doble pulso
                         var tiempos = [0, 0.2, 0.4, 0.6];
                         tiempos.forEach(function(t) {
                             var osc = ctx.createOscillator();
@@ -718,7 +748,6 @@ def render_tablero_fluido():
                 )
             total_pend = max(0, total_reg - total_env)
 
-            # CÁLCULO DE ALERTAS
             col_cer_check = next((c for c in df_vista.columns if "CER" in c.upper()), None)
             col_crm_check = next((c for c in df_vista.columns if "CRM" in c.upper() and "SALIDA" in c.upper()), None)
             
@@ -804,7 +833,6 @@ def render_tablero_fluido():
                 st.session_state.manual_nav_bonus = 30
                 st.rerun()
 
-        # BOTONES DE FILTRO ESTILIZADOS
         with col_f_todas:
             lbl_todas = "📋 Todas" if st.session_state.alert_filter != "TODAS" else "▶ 📋 Todas"
             if st.button(lbl_todas, key="btn_f_todas"):
@@ -849,7 +877,6 @@ def render_tablero_fluido():
                 st.session_state.last_search_time = time.time()
                 st.session_state.search_term = search_val
 
-        # FILTRADO DE TABLA
         col_cer_f = next((c for c in df_vista.columns if "CER" in c.upper()), None)
         col_crm_f = next((c for c in df_vista.columns if "CRM" in c.upper() and "SALIDA" in c.upper()), None)
 
@@ -863,7 +890,6 @@ def render_tablero_fluido():
                 df_vista[col_cer_f].astype(str).str.upper().str.contains("CORREC", na=False)
             ]
 
-        # BÚSQUEDA
         if st.session_state.search_term.strip():
             term = st.session_state.search_term.strip().lower()
             col_target = "# Orden" if "# Orden" in df_vista.columns else df_vista.columns[0]
@@ -871,7 +897,6 @@ def render_tablero_fluido():
                 df_vista[col_target].astype(str).str.lower().str.contains(term, na=False)
             ]
 
-        # PAGINACIÓN
         filas_por_pagina = 10
         total_filas = len(df_vista)
         total_paginas = max(1, (total_filas + filas_por_pagina - 1) // filas_por_pagina)
@@ -912,7 +937,6 @@ def render_tablero_fluido():
 
         st.markdown(render_dark_table(df_pagina), unsafe_allow_html=True)
 
-        # BOTONES DE PAGINACIÓN PEGANITOS
         if total_paginas > 1:
             num_btns = min(total_paginas, 12)
             col_widths = [0.04] * num_btns + [1.0 - (0.04 * num_btns)]
@@ -1050,13 +1074,13 @@ def render_tablero_fluido():
                 d_val = str(r[col_d] if col_d else "").strip()
                 e_val = r[col_e] if col_e else "PENDIENTE"
                 
-                is_ack = d_val in st.session_state.acknowledged_urgents
+                is_ack = d_val in ESTADO_GLOBAL["acknowledged_urgents"]
                 
                 st.markdown(render_bitacora_card(p_val, d_val, e_val, is_ack=is_ack), unsafe_allow_html=True)
                 
                 if str(p_val).strip().upper() == "URGENTE" and not is_ack:
                     if st.button("✅ Enterado", key=f"btn_ack_{idx_b}"):
-                        st.session_state.acknowledged_urgents.add(d_val)
+                        ESTADO_GLOBAL["acknowledged_urgents"].add(d_val)
                         st.rerun()
 
 
