@@ -60,22 +60,13 @@ st.markdown(
     /* OCULTAR ENCABEZADOS Y AJUSTAR CONTENEDOR PRINCIPAL */
     header, [data-testid="stHeader"] { display: none !important; }
     .block-container { 
-        padding-top: 0.5rem !important; 
+        padding-top: 0.3rem !important; 
         padding-bottom: 0.2rem !important; 
         padding-left: 1rem !important;
         padding-right: 1rem !important;
     }
 
     .stApp { background-color: #0B1120; color: #F3F4F6; font-size: 14px; }
-    
-    /* ENCABEZADO SUPERIOR */
-    .top-title {
-        font-size: 15px;
-        font-weight: 800;
-        color: #F3F4F6;
-        letter-spacing: 0.5px;
-        margin-bottom: 6px;
-    }
 
     /* TARJETAS KPI */
     .kpi-card {
@@ -157,24 +148,35 @@ st.markdown(
         border-color: #EF4444 !important;
     }
 
-    /* BOTÓN DE SONIDO DISCRETO INFERIOR */
-    button[key="btn_toggle_sound_active"] {
-        background-color: #064E3B !important;
-        color: #6EE7B7 !important;
+    /* BOTÓN DE SONIDO CON ALTO CONTRASTE */
+    button[aria-label*="AUDIO ON"] {
+        background-color: #059669 !important;
+        color: #FFFFFF !important;
         border: 1px solid #10B981 !important;
-        font-size: 10.5px !important;
-        height: 24px !important;
-        border-radius: 12px !important;
-        padding: 0 8px !important;
+        font-size: 11px !important;
+        font-weight: 800 !important;
+        height: 28px !important;
+        border-radius: 6px !important;
+        box-shadow: 0 0 6px rgba(16, 185, 129, 0.4) !important;
     }
-    button[key="btn_toggle_sound_muted"] {
-        background-color: #312E81 !important;
-        color: #A5B4FC !important;
-        border: 1px solid #6366F1 !important;
-        font-size: 10.5px !important;
-        height: 24px !important;
-        border-radius: 12px !important;
-        padding: 0 8px !important;
+    button[aria-label*="AUDIO ON"]:hover {
+        background-color: #10B981 !important;
+        color: #FFFFFF !important;
+    }
+
+    button[aria-label*="AUDIO OFF"] {
+        background-color: #DC2626 !important;
+        color: #FFFFFF !important;
+        border: 1px solid #EF4444 !important;
+        font-size: 11px !important;
+        font-weight: 800 !important;
+        height: 28px !important;
+        border-radius: 6px !important;
+        box-shadow: 0 0 6px rgba(239, 68, 68, 0.4) !important;
+    }
+    button[aria-label*="AUDIO OFF"]:hover {
+        background-color: #EF4444 !important;
+        color: #FFFFFF !important;
     }
 
     /* ANIMACIÓN PARPADEO CORRECCIÓN */
@@ -578,8 +580,6 @@ def toggle_sonido():
 # ---------------------------------------------------------
 @st.fragment(run_every=5)
 def render_tablero_fluido():
-    st.markdown('<div class="top-title">📊 TABLERO DE CONTROL - LABORATORIO</div>', unsafe_allow_html=True)
-
     df_main, df_bitacora, info_estado = cargar_datos_gsheets()
 
     activar_sonido_emergencia = False
@@ -800,7 +800,7 @@ def render_tablero_fluido():
                 columns=["Fecha_dt", "Fecha_Raw"], errors="ignore"
             )
 
-    # 1. KPIs SUPERIORES
+    # 1. KPIs SUPERIORES (AHORA INICIAN DIRECTAMENTE ARRIBA)
     col1, col2, col3, col4 = st.columns(4)
     with col1:
         st.markdown(
@@ -825,7 +825,7 @@ def render_tablero_fluido():
 
     st.markdown("<div style='margin-bottom: 2px;'></div>", unsafe_allow_html=True)
 
-    # 2. CONTROLES Y BUSCADOR MEJORADO CON X CLARA
+    # 2. CONTROLES Y BUSCADOR
     if df_vista is not None and not df_vista.empty:
         col_btn1, col_btn2, col_f_todas, col_f_atasc, col_f_correc, col_search_box, col_info = st.columns(
             [0.55, 0.55, 0.9, 1.2, 1.2, 2.2, 1.5]
@@ -866,7 +866,7 @@ def render_tablero_fluido():
                 st.session_state.page_index = 0
                 st.rerun()
 
-        # ÁREA DE BÚSQUEDA INTEGRADA CON X ROJA CLARA
+        # ÁREA DE BÚSQUEDA INTEGRADA CON X ROJA
         with col_search_box:
             c_in, c_x = st.columns([0.84, 0.16])
             with c_in:
@@ -1047,16 +1047,16 @@ def render_tablero_fluido():
         )
 
     with c_right:
-        # ENCABEZADO BITÁCORA + BOTÓN PEQUEÑO Y DISCRETO DE AUDIO ABAJO
-        col_b1, col_b2 = st.columns([0.7, 0.3])
+        # ENCABEZADO BITÁCORA + BOTÓN DE AUDIO DE ALTO CONTRASTE (VERDE / ROJO)
+        col_b1, col_b2 = st.columns([0.65, 0.35])
         with col_b1:
             st.markdown("<h4 style='margin:0 0 1px 0; font-size:13.5px; color:#F3F4F6;'>📌 Bitácora / Avisos</h4>", unsafe_allow_html=True)
             st.caption("Notas en tiempo real")
         with col_b2:
             if st.session_state.sound_enabled:
-                st.button("🔔 ON", key="btn_toggle_sound_active", on_click=toggle_sonido, help="Sonido Activado. Clic para silenciar.")
+                st.button("🔔 AUDIO ON", on_click=toggle_sonido, help="Sonido Activado. Clic para silenciar.")
             else:
-                st.button("🔕 OFF", key="btn_toggle_sound_muted", on_click=toggle_sonido, help="Sonido Silenciado. Clic para activar.")
+                st.button("🔕 AUDIO OFF", on_click=toggle_sonido, help="Sonido Silenciado. Clic para activar.")
 
         if df_bitacora is None or df_bitacora.empty:
             st.info("Sin avisos en 'NOTAS DEL DIA'.")
