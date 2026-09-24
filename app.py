@@ -52,7 +52,7 @@ if "alert_filter" not in st.session_state:
 
 
 # ---------------------------------------------------------
-# ESTILOS MODO OSCURO
+# ESTILOS MODO OSCURO CON BOTÓN DE AUDIO REDISEÑADO
 # ---------------------------------------------------------
 st.markdown(
     """
@@ -117,6 +117,44 @@ st.markdown(
         box-shadow: 0 0 8px rgba(59, 130, 246, 0.5) !important;
     }
 
+    /* ESTILOS EXCLUSIVOS: BOTÓN AUDIO ON (VERDE ESMERALDA NEÓN) */
+    .btn-audio-on div.stButton > button {
+        background: linear-gradient(135deg, #10B981 0%, #047857 100%) !important;
+        color: #FFFFFF !important;
+        border: 1.5px solid #34D399 !important;
+        border-radius: 20px !important;
+        font-size: 11.5px !important;
+        font-weight: 800 !important;
+        height: 30px !important;
+        box-shadow: 0 0 10px rgba(16, 185, 129, 0.5) !important;
+        text-shadow: 0 1px 2px rgba(0,0,0,0.6) !important;
+    }
+    .btn-audio-on div.stButton > button:hover {
+        background: linear-gradient(135deg, #34D399 0%, #10B981 100%) !important;
+        color: #FFFFFF !important;
+        border-color: #A7F3D0 !important;
+        box-shadow: 0 0 15px rgba(52, 211, 153, 0.8) !important;
+    }
+
+    /* ESTILOS EXCLUSIVOS: BOTÓN AUDIO OFF (ROJO CARMESÍ NEÓN) */
+    .btn-audio-off div.stButton > button {
+        background: linear-gradient(135deg, #EF4444 0%, #991B1B 100%) !important;
+        color: #FFFFFF !important;
+        border: 1.5px solid #F87171 !important;
+        border-radius: 20px !important;
+        font-size: 11.5px !important;
+        font-weight: 800 !important;
+        height: 30px !important;
+        box-shadow: 0 0 10px rgba(239, 68, 68, 0.5) !important;
+        text-shadow: 0 1px 2px rgba(0,0,0,0.6) !important;
+    }
+    .btn-audio-off div.stButton > button:hover {
+        background: linear-gradient(135deg, #F87171 0%, #DC2626 100%) !important;
+        color: #FFFFFF !important;
+        border-color: #FCA5A5 !important;
+        box-shadow: 0 0 15px rgba(248, 113, 113, 0.8) !important;
+    }
+
     /* CAMPO DE BÚSQUEDA */
     div[data-baseweb="input"] {
         background-color: #111827 !important;
@@ -146,37 +184,6 @@ st.markdown(
         background-color: #DC2626 !important;
         color: #FFFFFF !important;
         border-color: #EF4444 !important;
-    }
-
-    /* BOTÓN DE SONIDO CON ALTO CONTRASTE */
-    button[aria-label*="AUDIO ON"] {
-        background-color: #059669 !important;
-        color: #FFFFFF !important;
-        border: 1px solid #10B981 !important;
-        font-size: 11px !important;
-        font-weight: 800 !important;
-        height: 28px !important;
-        border-radius: 6px !important;
-        box-shadow: 0 0 6px rgba(16, 185, 129, 0.4) !important;
-    }
-    button[aria-label*="AUDIO ON"]:hover {
-        background-color: #10B981 !important;
-        color: #FFFFFF !important;
-    }
-
-    button[aria-label*="AUDIO OFF"] {
-        background-color: #DC2626 !important;
-        color: #FFFFFF !important;
-        border: 1px solid #EF4444 !important;
-        font-size: 11px !important;
-        font-weight: 800 !important;
-        height: 28px !important;
-        border-radius: 6px !important;
-        box-shadow: 0 0 6px rgba(239, 68, 68, 0.4) !important;
-    }
-    button[aria-label*="AUDIO OFF"]:hover {
-        background-color: #EF4444 !important;
-        color: #FFFFFF !important;
     }
 
     /* ANIMACIÓN PARPADEO CORRECCIÓN */
@@ -800,7 +807,7 @@ def render_tablero_fluido():
                 columns=["Fecha_dt", "Fecha_Raw"], errors="ignore"
             )
 
-    # 1. KPIs SUPERIORES (AHORA INICIAN DIRECTAMENTE ARRIBA)
+    # 1. KPIs SUPERIORES
     col1, col2, col3, col4 = st.columns(4)
     with col1:
         st.markdown(
@@ -1047,16 +1054,20 @@ def render_tablero_fluido():
         )
 
     with c_right:
-        # ENCABEZADO BITÁCORA + BOTÓN DE AUDIO DE ALTO CONTRASTE (VERDE / ROJO)
-        col_b1, col_b2 = st.columns([0.65, 0.35])
+        # ENCABEZADO BITÁCORA + BOTÓN DE AUDIO DE ALTO CONTRASTE Y ENVOLTURA DEDICADA
+        col_b1, col_b2 = st.columns([0.60, 0.40])
         with col_b1:
             st.markdown("<h4 style='margin:0 0 1px 0; font-size:13.5px; color:#F3F4F6;'>📌 Bitácora / Avisos</h4>", unsafe_allow_html=True)
             st.caption("Notas en tiempo real")
         with col_b2:
             if st.session_state.sound_enabled:
-                st.button("🔔 AUDIO ON", on_click=toggle_sonido, help="Sonido Activado. Clic para silenciar.")
+                st.markdown('<div class="btn-audio-on">', unsafe_allow_html=True)
+                st.button("🔊 AUDIO ON", on_click=toggle_sonido, key="btn_audio_state_on")
+                st.markdown('</div>', unsafe_allow_html=True)
             else:
-                st.button("🔕 AUDIO OFF", on_click=toggle_sonido, help="Sonido Silenciado. Clic para activar.")
+                st.markdown('<div class="btn-audio-off">', unsafe_allow_html=True)
+                st.button("🔇 MUTE OFF", on_click=toggle_sonido, key="btn_audio_state_off")
+                st.markdown('</div>', unsafe_allow_html=True)
 
         if df_bitacora is None or df_bitacora.empty:
             st.info("Sin avisos en 'NOTAS DEL DIA'.")
