@@ -12,16 +12,6 @@ import streamlit.components.v1 as components
 SPREADSHEET_ID = "1CvPEtDspm7g3T7yXDluEUD7kGyWH5abNAP1nkalX6sI"
 
 # ---------------------------------------------------------
-# AUDIO EN BASE64 (CHIME DE NOTIFICACIÓN)
-# ---------------------------------------------------------
-AUDIO_BASE64 = (
-    "UklGRmisAABXQVZFZm10IBAAAAABAAEAIlYAAESsAAACABAAZGF0YACsA"
-    "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
-    "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
-    "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
-)
-
-# ---------------------------------------------------------
 # CONFIGURACIÓN DE PÁGINA Y ESTILOS MODO OSCURO (ESCALA 125%)
 # ---------------------------------------------------------
 st.set_page_config(
@@ -42,7 +32,7 @@ st.markdown(
 
     .stApp { background-color: #0B1120; color: #F3F4F6; font-size: 14px; }
     
-    /* TARJETAS KPI ESCALADAS (ZOOM 125%) */
+    /* TARJETAS KPI ESCALADAS */
     .kpi-card {
         background-color: #111827;
         border: 1px solid #1F2937;
@@ -90,7 +80,7 @@ st.markdown(
         cursor: pointer !important;
     }
 
-    /* CAMPO DE BÚSQUEDA ESCALADO */
+    /* CAMPO DE BÚSQUEDA */
     div[data-baseweb="input"] {
         background-color: #111827 !important;
         border: 1px solid #3B82F6 !important;
@@ -103,7 +93,7 @@ st.markdown(
         padding: 2px 8px !important;
     }
 
-    /* ANIMACIÓN PARPADEO PARALELO CORRECCIÓN */
+    /* ANIMACIÓN PARPADEO CORRECCIÓN */
     @keyframes pulse-correccion {
         0% { background-color: rgba(239, 68, 68, 0.12); }
         50% { background-color: rgba(239, 68, 68, 0.30); }
@@ -114,9 +104,11 @@ st.markdown(
         border-left: 4px solid #EF4444 !important;
     }
 
-    ::-webkit-scrollbar { width: 5px; height: 5px; }
-    ::-webkit-scrollbar-track { background: #0B1120; }
-    ::-webkit-scrollbar-thumb { background: #1F2937; border-radius: 4px; }
+    /* PERSONALIZACIÓN DE BARRAS DE DESPLAZAMIENTO (SCROLLBARS) */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #111827; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb { background: #374151; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #3B82F6; }
 
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
@@ -154,9 +146,6 @@ def limpiar_texto(val):
 
 
 def leer_hoja_google(nombre_hoja, header_none=False):
-    """
-    Lee una pestaña de Google Sheets forzando bypass de cache con timestamp nanosegundo.
-    """
     nombre_enc = urllib.parse.quote(nombre_hoja)
     nocache = int(time.time() * 1000)
     url = f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet={nombre_enc}&_cb={nocache}"
@@ -431,14 +420,14 @@ def render_bitacora_card(prioridad_val, descripcion_val, estado_val):
 
 
 # ---------------------------------------------------------
-# TABLERO DE CONTROL DINÁMICO Y FLUIDO (REFRESCO CADA 5 SEGUNDOS)
+# TABLERO DE CONTROL DINÁMICO (REFRESCO CADA 5 SEGUNDOS)
 # ---------------------------------------------------------
 @st.fragment(run_every=5)
 def render_tablero_fluido():
     df_main, df_bitacora, info_estado, alarm_val = cargar_datos_gsheets()
 
     # ---------------------------------------------------------
-    # NOTIFICACIÓN NATIVA DEL NAVEGADOR + AUDIO CHIME
+    # ALERTA DE NAVEGADOR + AUDIOSINTETIZADOR REAL (WEB AUDIO API)
     # ---------------------------------------------------------
     if alarm_val is not None:
         if st.session_state.last_alarm_id is None:
@@ -452,38 +441,52 @@ def render_tablero_fluido():
                 f"""
                 <script>
                 (function() {{
-                    const audioBase64 = "{AUDIO_BASE64}";
                     const msj = "{texto_alerta}";
 
-                    function dispararNotificacionYSonido() {{
-                        // 1. Notificación Nativa del Sistema Operativo / Navegador
-                        if ("Notification" in window && Notification.permission === "granted") {{
-                            new Notification("⚠️ Alerta de Laboratorio", {{
-                                body: msj,
-                                icon: "https://cdn-icons-png.flaticon.com/512/1827/1827349.png",
-                                silent: true
-                            }});
-                        }}
-
-                        // 2. Reproducción del Chime de Audio
+                    function sonarChime() {{
                         try {{
-                            var snd = new Audio("data:audio/wav;base64," + audioBase64);
-                            snd.play().catch(function(e) {{ console.log("Audio diferido:", e); }});
+                            var AudioContext = window.AudioContext || window.webkitAudioContext;
+                            if (!AudioContext) return;
+                            var ctx = new AudioContext();
+                            
+                            // Nota 1 (E5 - 659Hz)
+                            var osc1 = ctx.createOscillator();
+                            var gain1 = ctx.createGain();
+                            osc1.type = 'sine';
+                            osc1.frequency.setValueAtTime(659.25, ctx.currentTime);
+                            gain1.gain.setValueAtTime(0.25, ctx.currentTime);
+                            gain1.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.35);
+                            osc1.connect(gain1);
+                            gain1.connect(ctx.destination);
+                            osc1.start(ctx.currentTime);
+                            osc1.stop(ctx.currentTime + 0.35);
+
+                            // Nota 2 (A5 - 880Hz)
+                            var osc2 = ctx.createOscillator();
+                            var gain2 = ctx.createGain();
+                            osc2.type = 'sine';
+                            osc2.frequency.setValueAtTime(880.00, ctx.currentTime + 0.12);
+                            gain2.gain.setValueAtTime(0.35, ctx.currentTime + 0.12);
+                            gain2.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.65);
+                            osc2.connect(gain2);
+                            gain2.connect(ctx.destination);
+                            osc2.start(ctx.currentTime + 0.12);
+                            osc2.stop(ctx.currentTime + 0.65);
                         }} catch(e) {{
-                            console.log("Error al reproducir audio:", e);
+                            console.log("Error generando sonido:", e);
                         }}
                     }}
 
-                    if ("Notification" in window) {{
-                        if (Notification.permission === "granted") {{
-                            dispararNotificacionYSonido();
-                        }} else if (Notification.permission !== "denied") {{
-                            Notification.requestPermission().then(function(permission) {{
-                                if (permission === "granted") {{
-                                    dispararNotificacionYSonido();
-                                }}
-                            }});
-                        }}
+                    // Disparar sonido inmediatamente
+                    sonarChime();
+
+                    // Disparar Notificación de Escritorio si hay permisos
+                    if ("Notification" in window && Notification.permission === "granted") {{
+                        new Notification("⚠️ Alerta de Laboratorio", {{
+                            body: msj,
+                            icon: "https://cdn-icons-png.flaticon.com/512/1827/1827349.png",
+                            silent: true
+                        }});
                     }}
                 }})();
                 </script>
@@ -706,20 +709,39 @@ def render_tablero_fluido():
                 st.session_state.search_term = search_val
 
         with col_perm:
-            # BOTÓN DE PERMISOS NATIVOS DEL NAVEGADOR
+            # BOTÓN DE ACTIVACIÓN Y PRUEBA DE SONIDO
             components.html(
                 """
-                <button onclick="solicitarPermiso()" style="background-color: #1E293B; color: #38BDF8; border: 1px solid #3B82F6; border-radius: 5px; padding: 2px 8px; font-size: 11.5px; font-weight: 700; width: 100%; height: 34px; cursor: pointer;">
-                    🔔 Habilitar Alertas
+                <button onclick="solicitarPermisoYSonar()" style="background-color: #1E293B; color: #38BDF8; border: 1px solid #3B82F6; border-radius: 5px; padding: 2px 8px; font-size: 11.5px; font-weight: 700; width: 100%; height: 34px; cursor: pointer;">
+                    🔔 Habilitar Audio y Avisos
                 </button>
                 <script>
-                function solicitarPermiso() {
+                function probarSonido() {
+                    try {
+                        var AudioContext = window.AudioContext || window.webkitAudioContext;
+                        if (!AudioContext) return;
+                        var ctx = new AudioContext();
+                        var osc = ctx.createOscillator();
+                        var gain = ctx.createGain();
+                        osc.type = 'sine';
+                        osc.frequency.setValueAtTime(587.33, ctx.currentTime);
+                        gain.gain.setValueAtTime(0.2, ctx.currentTime);
+                        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
+                        osc.connect(gain);
+                        gain.connect(ctx.destination);
+                        osc.start();
+                        osc.stop(ctx.currentTime + 0.3);
+                    } catch(e) {}
+                }
+
+                function solicitarPermisoYSonar() {
+                    probarSonido();
                     if ("Notification" in window) {
                         Notification.requestPermission().then(function(perm) {
                             if(perm === 'granted') {
-                                alert('✅ Notificaciones activadas en este equipo.');
+                                alert('✅ Audio y Notificaciones activados correctamente.');
                             } else {
-                                alert('⚠️ Permiso no otorgado. Habilítalo en el candado de la URL.');
+                                alert('🔔 Audio listo. (Las notificaciones emergentes se denegaron en el navegador).');
                             }
                         });
                     }
@@ -736,7 +758,7 @@ def render_tablero_fluido():
                 df_vista[col_target].astype(str).str.lower().str.contains(term, na=False)
             ]
 
-        # CALCULOS DE PAGINACIÓN Y TIEMPOS INTELIGENTES
+        # CALCULOS DE PAGINACIÓN
         filas_por_pagina = 10
         total_filas = len(df_vista)
         total_paginas = max(1, (total_filas + filas_por_pagina - 1) // filas_por_pagina)
@@ -751,7 +773,7 @@ def render_tablero_fluido():
         cant_items_pagina = len(df_pagina)
 
         if p_idx == 0:
-            duracion_base = 180  # 3 minutos fijos para la primera página
+            duracion_base = 180
         else:
             duracion_base = max(15, int(60 * (cant_items_pagina / filas_por_pagina)))
 
@@ -784,7 +806,7 @@ def render_tablero_fluido():
         unsafe_allow_html=True,
     )
 
-    # 3. SECCIÓN INFERIOR COMPACTA
+    # 3. SECCIÓN INFERIOR COMPACTA CON SCROLLBARS INTERNOS
     c_left, c_middle, c_right = st.columns([1.2, 1.1, 1.2])
 
     with c_left:
@@ -815,7 +837,8 @@ def render_tablero_fluido():
                 unsafe_allow_html=True,
             )
 
-            html_progresos = '<div style="display: flex; flex-direction: column; gap: 3px;">'
+            # CONTENEDOR CON SCROLL AUTO SI SUPERA LOS 200PX
+            html_progresos = '<div style="display: flex; flex-direction: column; gap: 3px; max-height: 200px; overflow-y: auto; padding-right: 4px;">'
             for ord_num, pct in progresos:
                 bar_color = "#10B981" if pct == 100 else ("#3B82F6" if pct >= 50 else "#F59E0B")
                 html_progresos += (
@@ -872,7 +895,8 @@ def render_tablero_fluido():
                 )
                 df_bitacora = df_bitacora.sort_values(by="_prio_sort").drop(columns=["_prio_sort"])
 
-            avisos_html = '<div style="display: flex; flex-direction: column; gap: 3px;">'
+            # CONTENEDOR CON SCROLLBAR PARA PERMITIR MÚLTIPLES NOTAS (4 O MÁS) SIN OCULTAR NADA
+            avisos_html = '<div style="display: flex; flex-direction: column; gap: 3px; max-height: 240px; overflow-y: auto; padding-right: 4px;">'
             for _, r in df_bitacora.iterrows():
                 p_val = r[col_p] if col_p else "NORMAL"
                 d_val = r[col_d] if col_d else ""
