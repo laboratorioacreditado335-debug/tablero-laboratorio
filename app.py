@@ -31,21 +31,15 @@ def obtener_estado_global():
 
 ESTADO_GLOBAL = obtener_estado_global()
 
-# ESTADOS DE SESIÓN LOCALES (Navegación e historial individual)
+# ESTADOS DE SESIÓN LOCALES
 if "page_index" not in st.session_state:
     st.session_state.page_index = 0
 if "last_switch_time" not in st.session_state:
     st.session_state.last_switch_time = time.time()
 if "search_term" not in st.session_state:
     st.session_state.search_term = ""
-if "search_history" not in st.session_state:
-    st.session_state.search_history = []
 if "manual_nav_bonus" not in st.session_state:
     st.session_state.manual_nav_bonus = 0
-if "last_search_time" not in st.session_state:
-    st.session_state.last_search_time = time.time()
-if "last_search_val" not in st.session_state:
-    st.session_state.last_search_val = ""
 
 if "prog_day_page" not in st.session_state:
     st.session_state.prog_day_page = 0
@@ -56,7 +50,7 @@ if "alert_filter" not in st.session_state:
 
 
 # ---------------------------------------------------------
-# ESTILOS MODO OSCURO CUIDADOS Y BOTONES DE FILTRO ESTILIZADOS
+# ESTILOS MODO OSCURO Y SUPERPOSICIÓN DE LA X EN EL BUSCADOR
 # ---------------------------------------------------------
 st.markdown(
     """
@@ -72,7 +66,7 @@ st.markdown(
 
     .stApp { background-color: #0B1120; color: #F3F4F6; font-size: 14px; }
     
-    /* TARJETAS KPI ESCALADAS */
+    /* TARJETAS KPI */
     .kpi-card {
         background-color: #111827;
         border: 1px solid #1F2937;
@@ -91,7 +85,7 @@ st.markdown(
     }
     .kpi-value { color: #FFFFFF; font-size: 22px; font-weight: 800; line-height: 1.1; }
 
-    /* TARJETAS DE PROGRESO DE ETAPA POR ÓRDEN */
+    /* TARJETAS DE PROGRESO DE ETAPA */
     .progress-order-card {
         background-color: #111827;
         border: 1px solid #1F2937;
@@ -121,7 +115,7 @@ st.markdown(
         box-shadow: 0 0 8px rgba(59, 130, 246, 0.5) !important;
     }
 
-    /* ESTILIZACIÓN PREMIUM PARA BOTONES DE FILTRO */
+    /* BOTONES DE FILTRO */
     div[data-testid="stHorizontalBlock"] > div:nth-child(3) button {
         background: linear-gradient(135deg, #1E293B, #0F172A) !important;
         color: #94A3B8 !important;
@@ -148,7 +142,7 @@ st.markdown(
         box-shadow: 0 0 10px rgba(220, 38, 38, 0.6) !important;
     }
 
-    /* CAMPO DE BÚSQUEDA */
+    /* CAMPO DE BÚSQUEDA CON ESPACIO DERECHO PARA LA X INTEGRADA */
     div[data-baseweb="input"] {
         background-color: #111827 !important;
         border: 1px solid #3B82F6 !important;
@@ -158,7 +152,32 @@ st.markdown(
     div[data-baseweb="input"] input {
         color: #F3F4F6 !important;
         font-size: 12.5px !important;
-        padding: 2px 8px !important;
+        padding: 2px 30px 2px 8px !important; /* Espacio reservado para la X */
+    }
+
+    /* SUPERPOSICIÓN DE BOTÓN X DENTRO DEL BUSCADOR */
+    div[data-testid="column"]:has(button[key="btn_clear_search"]) {
+        margin-left: -38px !important;
+        z-index: 10 !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+    }
+    div[data-testid="column"]:has(button[key="btn_clear_search"]) button {
+        background: transparent !important;
+        border: none !important;
+        color: #9CA3AF !important;
+        font-size: 13px !important;
+        height: 28px !important;
+        width: 28px !important;
+        min-height: 28px !important;
+        padding: 0 !important;
+        box-shadow: none !important;
+    }
+    div[data-testid="column"]:has(button[key="btn_clear_search"]) button:hover {
+        color: #EF4444 !important;
+        background: transparent !important;
+        box-shadow: none !important;
     }
 
     /* ANIMACIÓN PARPADEO CORRECCIÓN */
@@ -186,57 +205,68 @@ st.markdown(
 )
 
 # ---------------------------------------------------------
-# SISTEMA DE AUDIO ULTRA ESTABLE (MOTOR PADRE PERSISTENTE)
+# SISTEMA DE AUDIO GLOBAL ROBUSTO (NIVEL TOP WINDOW)
 # ---------------------------------------------------------
 components.html(
     """
     <script>
     (function() {
-        if (!window.parent._audioSystemReady) {
-            window.parent._audioCtx = null;
-            
-            function inicializarAudio() {
-                try {
-                    var AudioContext = window.AudioContext || window.webkitAudioContext;
-                    if (AudioContext && !window.parent._audioCtx) {
-                        window.parent._audioCtx = new AudioContext();
-                    }
-                    if (window.parent._audioCtx && window.parent._audioCtx.state === 'suspended') {
-                        window.parent._audioCtx.resume();
-                    }
-                } catch(e) { console.error("Error al inicializar audio:", e); }
-            }
-
-            // Desbloquear canal de audio global al primer clic o pulsación de tecla
-            ['click', 'keydown', 'touchstart'].forEach(function(evt) {
-                window.parent.document.addEventListener(evt, inicializarAudio, { passive: true });
-            });
-
-            // Función global reproducir llamada desde Streamlit
-            window.parent.playUrgentAlarm = function() {
-                try {
-                    inicializarAudio();
-                    var ctx = window.parent._audioCtx;
-                    if (!ctx) return;
-
-                    var tiempos = [0, 0.2, 0.4, 0.6];
-                    tiempos.forEach(function(t) {
-                        var osc = ctx.createOscillator();
-                        var gain = ctx.createGain();
-                        osc.type = 'sawtooth';
-                        osc.frequency.setValueAtTime(1050, ctx.currentTime + t);
-                        gain.gain.setValueAtTime(0.35, ctx.currentTime + t);
-                        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + t + 0.15);
-                        osc.connect(gain);
-                        gain.connect(ctx.destination);
-                        osc.start(ctx.currentTime + t);
-                        osc.stop(ctx.currentTime + t + 0.15);
-                    });
-                } catch(e) { console.error("Error al reproducir alarma:", e); }
-            };
-
-            window.parent._audioSystemReady = true;
+        var topWin = window.top || window.parent || window;
+        
+        function inicializarAudioGlobal() {
+            try {
+                if (!topWin._audioCtx) {
+                    var AudioCtx = topWin.AudioContext || topWin.webkitAudioContext;
+                    if (AudioCtx) topWin._audioCtx = new AudioCtx();
+                }
+                if (topWin._audioCtx && topWin._audioCtx.state === 'suspended') {
+                    topWin._audioCtx.resume();
+                }
+                topWin._audioHabilitado = true;
+            } catch(e) { console.error("Error iniciando audio:", e); }
         }
+
+        // Capturar eventos de desbloqueo global en el documento principal
+        ['click', 'keydown', 'touchstart', 'mousedown'].forEach(function(evt) {
+            try {
+                topWin.document.addEventListener(evt, inicializarAudioGlobal, { capture: true, passive: true });
+            } catch(e) {}
+        });
+
+        // Función global invocable desde Streamlit
+        topWin.playUrgentAlarm = function() {
+            inicializarAudioGlobal();
+            try {
+                var ctx = topWin._audioCtx;
+                if (!ctx) return;
+
+                if (ctx.state === 'suspended') {
+                    ctx.resume();
+                }
+
+                var now = ctx.currentTime;
+                var frecuencias = [880, 1174, 880, 1174]; // Ráfaga de tonos agudos tipo alarma
+                
+                frecuencias.forEach(function(freq, i) {
+                    var t = now + (i * 0.18);
+                    var osc = ctx.createOscillator();
+                    var gain = ctx.createGain();
+                    
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(freq, t);
+                    osc.frequency.exponentialRampToValueAtTime(freq * 1.25, t + 0.12);
+                    
+                    gain.gain.setValueAtTime(0.4, t);
+                    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.14);
+                    
+                    osc.connect(gain);
+                    gain.connect(ctx.destination);
+                    
+                    osc.start(t);
+                    osc.stop(t + 0.15);
+                });
+            } catch(e) { console.error("Error en reproductor de alarma:", e); }
+        };
     })();
     </script>
     """,
@@ -482,7 +512,7 @@ def render_dark_table(df_page):
     return html
 
 
-# BITÁCORA SINCRONIZADA EN TIEMPO REAL CON ESTADO GLOBAL
+# BITÁCORA SINCRONIZADA
 def render_bitacora_card(prioridad_val, descripcion_val, estado_val, is_ack=False):
     prioridad = (
         str(prioridad_val if pd.notna(prioridad_val) else "NORMAL").strip().upper()
@@ -539,7 +569,7 @@ def render_bitacora_card(prioridad_val, descripcion_val, estado_val, is_ack=Fals
         secs = elapsed_sec % 60
         time_formatted = f"{mins:02d}:{secs:02d}"
         
-        pct_bar = min(100, int((elapsed_sec / 600.0) * 100)) # Meta: 10 min = 600s
+        pct_bar = min(100, int((elapsed_sec / 600.0) * 100)) # Meta: 10 min
         
         if elapsed_sec < 300: # < 5 min
             bar_color = "#10B981"
@@ -573,7 +603,7 @@ def render_bitacora_card(prioridad_val, descripcion_val, estado_val, is_ack=Fals
 def render_tablero_fluido():
     df_main, df_bitacora, info_estado = cargar_datos_gsheets()
 
-    # LÓGICA DE ALERTA SONORA AL INICIO Y A LOS 10 MINUTOS EXACTOS
+    # LÓGICA DE ALERTA SONORA (INICIO Y MINUTO 10 EXACTO)
     activar_sonido_emergencia = False
     
     if df_bitacora is not None and not df_bitacora.empty:
@@ -614,14 +644,15 @@ def render_tablero_fluido():
                         sounded_set.add(1)
                         ESTADO_GLOBAL["urgent_sounded_stages"][desc_val] = sounded_set
 
-    # EJECUCIÓN DIRECTA DEL SONIDO DESDE EL MOTOR PADRE PERSISTENTE
+    # DISPARO DE SONIDO DESDE LA VENTANA PRINCIPAL
     if activar_sonido_emergencia:
         components.html(
             """
             <script>
             try {
-                if (window.parent && window.parent.playUrgentAlarm) {
-                    window.parent.playUrgentAlarm();
+                var topWin = window.top || window.parent || window;
+                if (topWin && topWin.playUrgentAlarm) {
+                    topWin.playUrgentAlarm();
                 }
             } catch(e) { console.error("Error activando alarma:", e); }
             </script>
@@ -826,10 +857,10 @@ def render_tablero_fluido():
 
     st.markdown("<div style='margin-bottom: 2px;'></div>", unsafe_allow_html=True)
 
-    # 2. CONTROLES, BUSCADOR AVANZADO Y BOTONES DE FILTRADO
+    # 2. CONTROLES, BOTÓN PROBAR AUDIO, FILTROS Y BUSCADOR INTEGRADO
     if df_vista is not None and not df_vista.empty:
-        col_btn1, col_btn2, col_f_todas, col_f_atasc, col_f_correc, col_search, col_info = st.columns(
-            [0.5, 0.5, 0.8, 1.2, 1.2, 2.3, 1.5]
+        col_btn1, col_btn2, col_audio, col_f_todas, col_f_atasc, col_f_correc, col_search, col_info = st.columns(
+            [0.5, 0.5, 0.9, 0.8, 1.2, 1.2, 2.0, 1.5]
         )
 
         with col_btn1:
@@ -845,6 +876,22 @@ def render_tablero_fluido():
                 st.session_state.last_switch_time = time.time()
                 st.session_state.manual_nav_bonus = 30
                 st.rerun()
+
+        # BOTÓN ACTIVAR/PROBAR AUDIO (Habilita el permiso del navegador al hacer 1 clic)
+        with col_audio:
+            if st.button("🔔 Activar Audio", help="Haz clic al iniciar el día para garantizar el sonido de las alarmas"):
+                components.html(
+                    """
+                    <script>
+                    var topWin = window.top || window.parent || window;
+                    if (topWin && topWin.playUrgentAlarm) {
+                        topWin.playUrgentAlarm();
+                    }
+                    </script>
+                    """,
+                    height=0,
+                    width=0,
+                )
 
         with col_f_todas:
             lbl_todas = "📋 Todas" if st.session_state.alert_filter != "TODAS" else "▶ 📋 Todas"
@@ -867,9 +914,9 @@ def render_tablero_fluido():
                 st.session_state.page_index = 0
                 st.rerun()
 
-        # BUSCADOR MEJORADO CON BOTÓN 'X' Y CONEXIÓN A HISTORIAL
+        # BUSCADOR CON BOTÓN "❌" INTEGRADO DENTRO DEL CAMPO
         with col_search:
-            c_input, c_clear = st.columns([0.84, 0.16])
+            c_input, c_clear = st.columns([0.88, 0.12])
             
             with c_input:
                 search_val = st.text_input(
@@ -879,25 +926,15 @@ def render_tablero_fluido():
                     key="search_input_widget",
                     label_visibility="collapsed",
                 )
-
-            with c_clear:
-                if st.button("❌", key="btn_clear_search", help="Borrar búsqueda"):
-                    st.session_state.search_term = ""
-                    st.session_state.last_search_val = ""
-                    if "search_input_widget" in st.session_state:
-                        st.session_state.search_input_widget = ""
-                    st.rerun()
-
-            # REGISTRO Y GESTIÓN DE HISTORIAL
-            if search_val != st.session_state.get("last_search_val", ""):
-                st.session_state.last_search_val = search_val
-                st.session_state.last_search_time = time.time()
                 st.session_state.search_term = search_val
 
-                clean_s = search_val.strip()
-                if clean_s and clean_s not in st.session_state.search_history:
-                    st.session_state.search_history.insert(0, clean_s)
-                    st.session_state.search_history = st.session_state.search_history[:5]
+            with c_clear:
+                if st.session_state.get("search_term", "").strip():
+                    if st.button("❌", key="btn_clear_search", help="Borrar texto"):
+                        st.session_state.search_term = ""
+                        if "search_input_widget" in st.session_state:
+                            st.session_state.search_input_widget = ""
+                        st.rerun()
 
         col_cer_f = next((c for c in df_vista.columns if "CER" in c.upper()), None)
         col_crm_f = next((c for c in df_vista.columns if "CRM" in c.upper() and "SALIDA" in c.upper()), None)
@@ -940,7 +977,7 @@ def render_tablero_fluido():
         duracion_total = duracion_base + st.session_state.get("manual_nav_bonus", 0)
 
         ahora = time.time()
-        tiempo_transcurrido = ahora - st.session_state.last_switch_time
+        tiempo_transcurrido = me = ahora - st.session_state.last_switch_time
 
         if tiempo_transcurrido >= duracion_total and total_paginas > 1:
             st.session_state.page_index = (st.session_state.page_index + 1) % total_paginas
@@ -956,19 +993,6 @@ def render_tablero_fluido():
                 f"Pág. {p_idx + 1}/{total_paginas} ({total_filas} reg.){f_active}"
                 f" | ⏱️ Rotación: {segundos_restantes}s{bonus_str}"
             )
-
-        # DESPLIEGUE VISUAL DE ETIQUETAS DE HISTORIAL DE BÚSQUEDA
-        if st.session_state.search_history:
-            hist_cols = st.columns([0.15] + [0.17] * len(st.session_state.search_history) + [1.0])
-            with hist_cols[0]:
-                st.markdown("<span style='font-size:10px; color:#9CA3AF; line-height:2.2;'>Historial:</span>", unsafe_allow_html=True)
-            for h_idx, h_term in enumerate(st.session_state.search_history):
-                with hist_cols[h_idx + 1]:
-                    if st.button(f"🔍 {h_term}", key=f"btn_hist_{h_idx}"):
-                        st.session_state.search_term = h_term
-                        st.session_state.last_search_val = h_term
-                        st.session_state.last_search_time = time.time()
-                        st.rerun()
 
         st.markdown(render_dark_table(df_pagina), unsafe_allow_html=True)
 
