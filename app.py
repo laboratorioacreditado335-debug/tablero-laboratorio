@@ -31,13 +31,15 @@ def obtener_estado_global():
 
 ESTADO_GLOBAL = obtener_estado_global()
 
-# ESTADOS DE SESIÓN LOCALES (Navegación individual por pestaña)
+# ESTADOS DE SESIÓN LOCALES (Navegación e historial individual)
 if "page_index" not in st.session_state:
     st.session_state.page_index = 0
 if "last_switch_time" not in st.session_state:
     st.session_state.last_switch_time = time.time()
 if "search_term" not in st.session_state:
     st.session_state.search_term = ""
+if "search_history" not in st.session_state:
+    st.session_state.search_history = []
 if "manual_nav_bonus" not in st.session_state:
     st.session_state.manual_nav_bonus = 0
 if "last_search_time" not in st.session_state:
@@ -183,24 +185,57 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# ACTIVADOR SILENCIOSO DE PERMISO DE AUDIO AL PRIMER CLIC
+# ---------------------------------------------------------
+# SISTEMA DE AUDIO ULTRA ESTABLE (MOTOR PADRE PERSISTENTE)
+# ---------------------------------------------------------
 components.html(
     """
     <script>
     (function() {
-        if (!window.parent._audioUnlocked) {
-            const unlock = function() {
+        if (!window.parent._audioSystemReady) {
+            window.parent._audioCtx = null;
+            
+            function inicializarAudio() {
                 try {
                     var AudioContext = window.AudioContext || window.webkitAudioContext;
-                    if (AudioContext) {
-                        var ctx = new AudioContext();
-                        if (ctx.state === 'suspended') { ctx.resume(); }
+                    if (AudioContext && !window.parent._audioCtx) {
+                        window.parent._audioCtx = new AudioContext();
                     }
-                    window.parent._audioUnlocked = true;
-                } catch(e) {}
+                    if (window.parent._audioCtx && window.parent._audioCtx.state === 'suspended') {
+                        window.parent._audioCtx.resume();
+                    }
+                } catch(e) { console.error("Error al inicializar audio:", e); }
+            }
+
+            // Desbloquear canal de audio global al primer clic o pulsación de tecla
+            ['click', 'keydown', 'touchstart'].forEach(function(evt) {
+                window.parent.document.addEventListener(evt, inicializarAudio, { passive: true });
+            });
+
+            // Función global reproducir llamada desde Streamlit
+            window.parent.playUrgentAlarm = function() {
+                try {
+                    inicializarAudio();
+                    var ctx = window.parent._audioCtx;
+                    if (!ctx) return;
+
+                    var tiempos = [0, 0.2, 0.4, 0.6];
+                    tiempos.forEach(function(t) {
+                        var osc = ctx.createOscillator();
+                        var gain = ctx.createGain();
+                        osc.type = 'sawtooth';
+                        osc.frequency.setValueAtTime(1050, ctx.currentTime + t);
+                        gain.gain.setValueAtTime(0.35, ctx.currentTime + t);
+                        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + t + 0.15);
+                        osc.connect(gain);
+                        gain.connect(ctx.destination);
+                        osc.start(ctx.currentTime + t);
+                        osc.stop(ctx.currentTime + t + 0.15);
+                    });
+                } catch(e) { console.error("Error al reproducir alarma:", e); }
             };
-            window.parent.document.addEventListener('click', unlock, { once: true });
-            window.parent.document.addEventListener('keydown', unlock, { once: true });
+
+            window.parent._audioSystemReady = true;
         }
     })();
     </script>
@@ -556,11 +591,9 @@ def render_tablero_fluido():
                 desc_val = str(row[col_d]).strip()
                 
                 if prio_val == "URGENTE" and desc_val:
-                    # Si YA le dieron 'Enterado' en CUALQUIER PC, no suena
                     if desc_val in ESTADO_GLOBAL["acknowledged_urgents"]:
                         continue
                     
-                    # Registrar tiempo inicial compartida globalmente entre computadores
                     if desc_val not in ESTADO_GLOBAL["urgent_start_times"]:
                         ESTADO_GLOBAL["urgent_start_times"][desc_val] = now_time
                         ESTADO_GLOBAL["urgent_sounded_stages"][desc_val] = set()
@@ -569,48 +602,28 @@ def render_tablero_fluido():
                     elapsed = now_time - start_t
                     sounded_set = ESTADO_GLOBAL["urgent_sounded_stages"].get(desc_val, set())
 
-                    # ETAPA 0: Al surgir por primera vez (Inicio)
+                    # ETAPA 0: Al surgir por primera vez
                     if 0 not in sounded_set:
                         activar_sonido_emergencia = True
                         sounded_set.add(0)
                         ESTADO_GLOBAL["urgent_sounded_stages"][desc_val] = sounded_set
 
-                    # ETAPA 1: Al pasar o superar los 10 minutos (>= 600 segundos)
+                    # ETAPA 1: Al pasar o superar los 10 minutos (>= 600s)
                     if elapsed >= 600 and 1 not in sounded_set:
                         activar_sonido_emergencia = True
                         sounded_set.add(1)
                         ESTADO_GLOBAL["urgent_sounded_stages"][desc_val] = sounded_set
 
-    # EMISIÓN DE SONIDO VÍA WEB AUDIO API
+    # EJECUCIÓN DIRECTA DEL SONIDO DESDE EL MOTOR PADRE PERSISTENTE
     if activar_sonido_emergencia:
         components.html(
             """
             <script>
-            (function() {
-                function dispararAlarma() {
-                    try {
-                        var AudioContext = window.AudioContext || window.webkitAudioContext;
-                        if (!AudioContext) return;
-                        var ctx = new AudioContext();
-                        if (ctx.state === 'suspended') { ctx.resume(); }
-
-                        var tiempos = [0, 0.2, 0.4, 0.6];
-                        tiempos.forEach(function(t) {
-                            var osc = ctx.createOscillator();
-                            var gain = ctx.createGain();
-                            osc.type = 'sawtooth';
-                            osc.frequency.setValueAtTime(1050, ctx.currentTime + t);
-                            gain.gain.setValueAtTime(0.35, ctx.currentTime + t);
-                            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + t + 0.15);
-                            osc.connect(gain);
-                            gain.connect(ctx.destination);
-                            osc.start(ctx.currentTime + t);
-                            osc.stop(ctx.currentTime + t + 0.15);
-                        });
-                    } catch(e) { console.log(e); }
+            try {
+                if (window.parent && window.parent.playUrgentAlarm) {
+                    window.parent.playUrgentAlarm();
                 }
-                dispararAlarma();
-            })();
+            } catch(e) { console.error("Error activando alarma:", e); }
             </script>
             """,
             height=0,
@@ -813,10 +826,10 @@ def render_tablero_fluido():
 
     st.markdown("<div style='margin-bottom: 2px;'></div>", unsafe_allow_html=True)
 
-    # 2. CONTROLES Y BOTONES DE FILTRADO ESTILIZADOS
+    # 2. CONTROLES, BUSCADOR AVANZADO Y BOTONES DE FILTRADO
     if df_vista is not None and not df_vista.empty:
         col_btn1, col_btn2, col_f_todas, col_f_atasc, col_f_correc, col_search, col_info = st.columns(
-            [0.6, 0.6, 0.9, 1.3, 1.3, 2.0, 1.8]
+            [0.5, 0.5, 0.8, 1.2, 1.2, 2.3, 1.5]
         )
 
         with col_btn1:
@@ -854,28 +867,37 @@ def render_tablero_fluido():
                 st.session_state.page_index = 0
                 st.rerun()
 
+        # BUSCADOR MEJORADO CON BOTÓN 'X' Y CONEXIÓN A HISTORIAL
         with col_search:
-            ahora_search = time.time()
-            if st.session_state.get("search_term", ""):
-                if ahora_search - st.session_state.get("last_search_time", ahora_search) >= 180:
+            c_input, c_clear = st.columns([0.84, 0.16])
+            
+            with c_input:
+                search_val = st.text_input(
+                    "Buscar Orden",
+                    value=st.session_state.get("search_term", ""),
+                    placeholder="🔍 Buscar N° Orden...",
+                    key="search_input_widget",
+                    label_visibility="collapsed",
+                )
+
+            with c_clear:
+                if st.button("❌", key="btn_clear_search", help="Borrar búsqueda"):
                     st.session_state.search_term = ""
                     st.session_state.last_search_val = ""
                     if "search_input_widget" in st.session_state:
                         st.session_state.search_input_widget = ""
                     st.rerun()
 
-            search_val = st.text_input(
-                "Buscar Orden",
-                value=st.session_state.get("search_term", ""),
-                placeholder="🔍 Buscar N° Orden...",
-                key="search_input_widget",
-                label_visibility="collapsed",
-            )
-
+            # REGISTRO Y GESTIÓN DE HISTORIAL
             if search_val != st.session_state.get("last_search_val", ""):
                 st.session_state.last_search_val = search_val
                 st.session_state.last_search_time = time.time()
                 st.session_state.search_term = search_val
+
+                clean_s = search_val.strip()
+                if clean_s and clean_s not in st.session_state.search_history:
+                    st.session_state.search_history.insert(0, clean_s)
+                    st.session_state.search_history = st.session_state.search_history[:5]
 
         col_cer_f = next((c for c in df_vista.columns if "CER" in c.upper()), None)
         col_crm_f = next((c for c in df_vista.columns if "CRM" in c.upper() and "SALIDA" in c.upper()), None)
@@ -934,6 +956,19 @@ def render_tablero_fluido():
                 f"Pág. {p_idx + 1}/{total_paginas} ({total_filas} reg.){f_active}"
                 f" | ⏱️ Rotación: {segundos_restantes}s{bonus_str}"
             )
+
+        # DESPLIEGUE VISUAL DE ETIQUETAS DE HISTORIAL DE BÚSQUEDA
+        if st.session_state.search_history:
+            hist_cols = st.columns([0.15] + [0.17] * len(st.session_state.search_history) + [1.0])
+            with hist_cols[0]:
+                st.markdown("<span style='font-size:10px; color:#9CA3AF; line-height:2.2;'>Historial:</span>", unsafe_allow_html=True)
+            for h_idx, h_term in enumerate(st.session_state.search_history):
+                with hist_cols[h_idx + 1]:
+                    if st.button(f"🔍 {h_term}", key=f"btn_hist_{h_idx}"):
+                        st.session_state.search_term = h_term
+                        st.session_state.last_search_val = h_term
+                        st.session_state.last_search_time = time.time()
+                        st.rerun()
 
         st.markdown(render_dark_table(df_pagina), unsafe_allow_html=True)
 
