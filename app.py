@@ -12,7 +12,7 @@ import streamlit.components.v1 as components
 SPREADSHEET_ID = "1CvPEtDspm7g3T7yXDluEUD7kGyWH5abNAP1nkalX6sI"
 
 # ---------------------------------------------------------
-# CONFIGURACIÓN DE PÁGINA Y ESTILOS MODO OSCURO (ESCALA 125%)
+# CONFIGURACIÓN DE PÁGINA Y ESTILOS MODO OSCURO
 # ---------------------------------------------------------
 st.set_page_config(
     page_title="Tablero de Control - Laboratorio", page_icon="📊", layout="wide"
@@ -125,8 +125,8 @@ if "search_term" not in st.session_state:
     st.session_state.search_term = ""
 if "manual_nav_bonus" not in st.session_state:
     st.session_state.manual_nav_bonus = 0
-if "last_alarm_id" not in st.session_state:
-    st.session_state.last_alarm_id = None
+if "known_urgents" not in st.session_state:
+    st.session_state.known_urgents = None  # Se inicializará con la primera carga
 if "last_search_time" not in st.session_state:
     st.session_state.last_search_time = time.time()
 if "last_search_val" not in st.session_state:
@@ -217,18 +217,7 @@ def cargar_datos_gsheets():
         df_proceso_raw = leer_hoja_google("C. Proceso órdenes", header_none=True)
         df_notas_raw = leer_hoja_google("NOTAS DEL DIA", header_none=True)
 
-        alarm_trigger_val = None
-        if df_notas_raw is not None and not df_notas_raw.empty:
-            try:
-                if df_notas_raw.shape[0] > 1 and df_notas_raw.shape[1] > 3:
-                    v_d2 = str(df_notas_raw.iloc[1, 3]).strip()
-                    if v_d2 and v_d2.lower() not in ["nan", "none", "null", ""]:
-                        alarm_trigger_val = v_d2
-            except Exception:
-                pass
-
         df_proceso = pd.DataFrame()
-
         if df_proceso_raw is not None and not df_proceso_raw.empty:
             header_idx = None
             for idx, row in df_proceso_raw.iterrows():
@@ -256,6 +245,7 @@ def cargar_datos_gsheets():
                 if (
                     "DESCRIPCIÓN" in row_str
                     or "DESCRIPCION" in row_str
+                    or "PRIORIDA" in row_str
                     or "TIPO" in row_str
                     or "NOTA" in row_str
                 ):
@@ -271,10 +261,10 @@ def cargar_datos_gsheets():
             df_notas.columns = [str(col).strip() for col in df_notas.columns]
             df_notas = df_notas.replace("", np.nan).dropna(how="all")
 
-        return df_proceso, df_notas, "Conectado correctamente", alarm_trigger_val
+        return df_proceso, df_notas, "Conectado correctamente"
 
     except Exception as e:
-        return None, None, f"Error al conectar con Google Sheets: {str(e)}", None
+        return None, None, f"Error al conectar con Google Sheets: {str(e)}"
 
 
 def render_dark_table(df_page):
@@ -386,6 +376,8 @@ def render_bitacora_card(prioridad_val, descripcion_val, estado_val):
 
     priority_colors = {
         "URGENTE": "#EF4444",
+        "AUDITORÍA": "#A855F7",
+        "AUDITORIA": "#A855F7",
         "REVISIÓN": "#F59E0B",
         "REVISION": "#F59E0B",
         "AVISO": "#3B82F6",
@@ -396,6 +388,11 @@ def render_bitacora_card(prioridad_val, descripcion_val, estado_val):
 
     status_styles = {
         "PENDIENTE": {
+            "bg": "rgba(239, 68, 68, 0.2)",
+            "text": "#FCA5A5",
+            "border": "#EF4444",
+        },
+        "PENDIEN": {
             "bg": "rgba(239, 68, 68, 0.2)",
             "text": "#FCA5A5",
             "border": "#EF4444",
@@ -424,76 +421,108 @@ def render_bitacora_card(prioridad_val, descripcion_val, estado_val):
 # ---------------------------------------------------------
 @st.fragment(run_every=5)
 def render_tablero_fluido():
-    df_main, df_bitacora, info_estado, alarm_val = cargar_datos_gsheets()
+    df_main, df_bitacora, info_estado = cargar_datos_gsheets()
 
     # ---------------------------------------------------------
-    # ALERTA DE NAVEGADOR + AUDIOSINTETIZADOR REAL (WEB AUDIO API)
+    # DETECCION AUTOMATICA DE NUEVAS NOTAS 'URGENTE'
     # ---------------------------------------------------------
-    if alarm_val is not None:
-        if st.session_state.last_alarm_id is None:
-            st.session_state.last_alarm_id = alarm_val
-        elif st.session_state.last_alarm_id != alarm_val:
-            st.session_state.last_alarm_id = alarm_val
-            
-            texto_alerta = str(alarm_val).replace("'", "\\'").replace("\n", " ")
-            
-            components.html(
-                f"""
-                <script>
-                (function() {{
-                    const msj = "{texto_alerta}";
+    urgentes_actuales = set()
+    if df_bitacora is not None and not df_bitacora.empty:
+        col_p = next(
+            (
+                c
+                for c in df_bitacora.columns
+                if "PRIORI" in str(c).upper()
+                or "PO" in str(c).upper()
+                or "TIPO" in str(c).upper()
+            ),
+            None,
+        )
+        col_d = next(
+            (
+                c
+                for c in df_bitacora.columns
+                if "DESCRIP" in str(c).upper()
+                or "NOTA" in str(c).upper()
+                or "AVISO" in str(c).upper()
+            ),
+            None,
+        )
 
-                    function sonarChime() {{
-                        try {{
-                            var AudioContext = window.AudioContext || window.webkitAudioContext;
-                            if (!AudioContext) return;
-                            var ctx = new AudioContext();
-                            
-                            // Nota 1 (E5 - 659Hz)
-                            var osc1 = ctx.createOscillator();
-                            var gain1 = ctx.createGain();
-                            osc1.type = 'sine';
-                            osc1.frequency.setValueAtTime(659.25, ctx.currentTime);
-                            gain1.gain.setValueAtTime(0.25, ctx.currentTime);
-                            gain1.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.35);
-                            osc1.connect(gain1);
-                            gain1.connect(ctx.destination);
-                            osc1.start(ctx.currentTime);
-                            osc1.stop(ctx.currentTime + 0.35);
+        if col_p and col_d:
+            for _, row in df_bitacora.iterrows():
+                prio_val = str(row[col_p]).strip().upper()
+                desc_val = str(row[col_d]).strip()
+                if prio_val == "URGENTE" and desc_val:
+                    urgentes_actuales.add(desc_val)
 
-                            // Nota 2 (A5 - 880Hz)
-                            var osc2 = ctx.createOscillator();
-                            var gain2 = ctx.createGain();
-                            osc2.type = 'sine';
-                            osc2.frequency.setValueAtTime(880.00, ctx.currentTime + 0.12);
-                            gain2.gain.setValueAtTime(0.35, ctx.currentTime + 0.12);
-                            gain2.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.65);
-                            osc2.connect(gain2);
-                            gain2.connect(ctx.destination);
-                            osc2.start(ctx.currentTime + 0.12);
-                            osc2.stop(ctx.currentTime + 0.65);
-                        }} catch(e) {{
-                            console.log("Error generando sonido:", e);
-                        }}
-                    }}
+    # Lógica de detección de items URGENTE nuevos
+    reproducir_sonido = False
+    texto_alerta = ""
 
-                    // Disparar sonido inmediatamente
-                    sonarChime();
+    if st.session_state.known_urgents is None:
+        # Primera carga: Memorizamos las existentes para no sonar al refrescar la pantalla inicial
+        st.session_state.known_urgents = urgentes_actuales
+    else:
+        nuevos_urgentes = urgentes_actuales - st.session_state.known_urgents
+        if nuevos_urgentes:
+            reproducir_sonido = True
+            texto_alerta = " / ".join(list(nuevos_urgentes))
+            st.session_state.known_urgents = urgentes_actuales
 
-                    // Disparar Notificación de Escritorio si hay permisos
-                    if ("Notification" in window && Notification.permission === "granted") {{
-                        new Notification("⚠️ Alerta de Laboratorio", {{
-                            body: msj,
-                            icon: "https://cdn-icons-png.flaticon.com/512/1827/1827349.png",
-                            silent: true
-                        }});
-                    }}
-                }})();
-                </script>
-                """,
-                height=1,
-                width=1,
-            )
+    # DISPARADOR AUTOMÁTICO DE AUDIO
+    if reproducir_sonido:
+        texto_clean = texto_alerta.replace("'", "\\'").replace("\n", " ")
+        components.html(
+            f"""
+            <script>
+            (function() {{
+                function sonarAlertaAuto() {{
+                    try {{
+                        var AudioContext = window.AudioContext || window.webkitAudioContext;
+                        if (!AudioContext) return;
+                        var ctx = new AudioContext();
+                        
+                        // Tono 1 (Urgent Pitch)
+                        var osc1 = ctx.createOscillator();
+                        var gain1 = ctx.createGain();
+                        osc1.type = 'sawtooth';
+                        osc1.frequency.setValueAtTime(880, ctx.currentTime);
+                        gain1.gain.setValueAtTime(0.3, ctx.currentTime);
+                        gain1.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
+                        osc1.connect(gain1);
+                        gain1.connect(ctx.destination);
+                        osc1.start(ctx.currentTime);
+                        osc1.stop(ctx.currentTime + 0.3);
+
+                        // Tono 2
+                        var osc2 = ctx.createOscillator();
+                        var gain2 = ctx.createGain();
+                        osc2.type = 'sawtooth';
+                        osc2.frequency.setValueAtTime(1046.50, ctx.currentTime + 0.2);
+                        gain2.gain.setValueAtTime(0.4, ctx.currentTime + 0.2);
+                        gain2.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.6);
+                        osc2.connect(gain2);
+                        gain2.connect(ctx.destination);
+                        osc2.start(ctx.currentTime + 0.2);
+                        osc2.stop(ctx.currentTime + 0.6);
+                    }} catch(e) {{ console.log(e); }}
+                }}
+
+                sonarAlertaAuto();
+
+                if ("Notification" in window && Notification.permission === "granted") {{
+                    new Notification("🚨 NOTA URGENTE EN BITÁCORA", {{
+                        body: "{texto_clean}",
+                        icon: "https://cdn-icons-png.flaticon.com/512/1827/1827349.png"
+                    }});
+                }}
+            }})();
+            </script>
+            """,
+            height=1,
+            width=1,
+        )
 
     cols_deseadas = [
         "Fecha",
@@ -709,42 +738,26 @@ def render_tablero_fluido():
                 st.session_state.search_term = search_val
 
         with col_perm:
-            # BOTÓN DE ACTIVACIÓN Y PRUEBA DE SONIDO
+            # BOTÓN DE PRIMERA ACTIVACIÓN OBLIGATORIA POR NAVEGADOR
             components.html(
                 """
-                <button onclick="solicitarPermisoYSonar()" style="background-color: #1E293B; color: #38BDF8; border: 1px solid #3B82F6; border-radius: 5px; padding: 2px 8px; font-size: 11.5px; font-weight: 700; width: 100%; height: 34px; cursor: pointer;">
-                    🔔 Habilitar Audio y Avisos
+                <button onclick="desbloquearAudio()" style="background-color: #1E293B; color: #38BDF8; border: 1px solid #3B82F6; border-radius: 5px; padding: 2px 8px; font-size: 11px; font-weight: 700; width: 100%; height: 34px; cursor: pointer;">
+                    🔔 Activar Permiso de Audio
                 </button>
                 <script>
-                function probarSonido() {
+                function desbloquearAudio() {
                     try {
                         var AudioContext = window.AudioContext || window.webkitAudioContext;
-                        if (!AudioContext) return;
-                        var ctx = new AudioContext();
-                        var osc = ctx.createOscillator();
-                        var gain = ctx.createGain();
-                        osc.type = 'sine';
-                        osc.frequency.setValueAtTime(587.33, ctx.currentTime);
-                        gain.gain.setValueAtTime(0.2, ctx.currentTime);
-                        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
-                        osc.connect(gain);
-                        gain.connect(ctx.destination);
-                        osc.start();
-                        osc.stop(ctx.currentTime + 0.3);
+                        if (AudioContext) {
+                            var ctx = new AudioContext();
+                            ctx.resume();
+                        }
                     } catch(e) {}
-                }
-
-                function solicitarPermisoYSonar() {
-                    probarSonido();
+                    
                     if ("Notification" in window) {
-                        Notification.requestPermission().then(function(perm) {
-                            if(perm === 'granted') {
-                                alert('✅ Audio y Notificaciones activados correctamente.');
-                            } else {
-                                alert('🔔 Audio listo. (Las notificaciones emergentes se denegaron en el navegador).');
-                            }
-                        });
+                        Notification.requestPermission();
                     }
+                    alert('✅ Audio habilitado. Las notas URGENTES sonar\u00e1n autom\u00e1ticamente sin dar clic.');
                 }
                 </script>
                 """,
@@ -837,7 +850,6 @@ def render_tablero_fluido():
                 unsafe_allow_html=True,
             )
 
-            # CONTENEDOR CON SCROLL AUTO SI SUPERA LOS 200PX
             html_progresos = '<div style="display: flex; flex-direction: column; gap: 3px; max-height: 200px; overflow-y: auto; padding-right: 4px;">'
             for ord_num, pct in progresos:
                 bar_color = "#10B981" if pct == 100 else ("#3B82F6" if pct >= 50 else "#F59E0B")
@@ -877,25 +889,26 @@ def render_tablero_fluido():
         if df_bitacora is None or df_bitacora.empty:
             st.info("Sin avisos en 'NOTAS DEL DIA'.")
         else:
-            col_p = next((c for c in df_bitacora.columns if "TIPO" in str(c).upper() or "PRIORIDAD" in str(c).upper()), None)
+            col_p = next((c for c in df_bitacora.columns if "PRIORI" in str(c).upper() or "PO" in str(c).upper() or "TIPO" in str(c).upper()), None)
             col_d = next((c for c in df_bitacora.columns if "DESCRIP" in str(c).upper() or "NOTA" in str(c).upper() or "AVISO" in str(c).upper()), None)
             col_e = next((c for c in df_bitacora.columns if "ESTADO" in str(c).upper()), None)
 
             if col_p and col_p in df_bitacora.columns:
                 prio_map = {
                     "URGENTE": 1,
-                    "REVISIÓN": 2,
-                    "REVISION": 2,
-                    "AVISO": 3,
-                    "MANTENIMIENTO": 4,
-                    "NORMAL": 5,
+                    "AUDITORÍA": 2,
+                    "AUDITORIA": 2,
+                    "REVISIÓN": 3,
+                    "REVISION": 3,
+                    "AVISO": 4,
+                    "MANTENIMIENTO": 5,
+                    "NORMAL": 6,
                 }
                 df_bitacora["_prio_sort"] = df_bitacora[col_p].apply(
                     lambda x: prio_map.get(str(x).strip().upper(), 99)
                 )
                 df_bitacora = df_bitacora.sort_values(by="_prio_sort").drop(columns=["_prio_sort"])
 
-            # CONTENEDOR CON SCROLLBAR PARA PERMITIR MÚLTIPLES NOTAS (4 O MÁS) SIN OCULTAR NADA
             avisos_html = '<div style="display: flex; flex-direction: column; gap: 3px; max-height: 240px; overflow-y: auto; padding-right: 4px;">'
             for _, r in df_bitacora.iterrows():
                 p_val = r[col_p] if col_p else "NORMAL"
