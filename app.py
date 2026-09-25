@@ -881,6 +881,8 @@ def render_tablero_fluido():
     for m in ESTADO_GLOBAL["mensajes_bitacora"]:
         if "permitir_respuestas" not in m:
             m["permitir_respuestas"] = False
+        if "mostrar_respuestas" not in m:
+            m["mostrar_respuestas"] = False
         if "respuestas" not in m:
             m["respuestas"] = []
 
@@ -923,6 +925,7 @@ def render_tablero_fluido():
                 "usuario_enterado": None,
                 "fecha_enterado": None,
                 "permitir_respuestas": False,
+                "mostrar_respuestas": False,
                 "respuestas": []
             })
         ESTADO_GLOBAL["cargado_gsheet"] = True
@@ -1396,6 +1399,12 @@ def render_tablero_fluido():
                 key="bit_contenido_input"
             )
 
+            permitir_resp_sel = st.checkbox(
+                "💬 Habilitar opción de respuestas / hilo de conversación",
+                value=False,
+                key="bit_permitir_resp_input"
+            )
+
             if st.button("🚀 Publicar Novedad", key="btn_publicar_bitacora"):
                 if contenido_input.strip():
                     now_ts_pub = time.time()
@@ -1410,7 +1419,8 @@ def render_tablero_fluido():
                         "estado": "Pendiente",
                         "usuario_enterado": None,
                         "fecha_enterado": None,
-                        "permitir_respuestas": False,
+                        "permitir_respuestas": permitir_resp_sel,
+                        "mostrar_respuestas": False,
                         "respuestas": []
                     }
                     ESTADO_GLOBAL["mensajes_bitacora"].insert(0, nuevo_msg)
@@ -1477,43 +1487,45 @@ def render_tablero_fluido():
                             ESTADO_GLOBAL["mensajes_bitacora"] = [m for m in ESTADO_GLOBAL["mensajes_bitacora"] if m["id"] != msg["id"]]
                             st.rerun()
 
-                # SECCIÓN DE RESPUESTAS HILADAS
-                c_resp_toggle, _ = st.columns([0.40, 0.60])
-                with c_resp_toggle:
-                    lbl_r_toggle = "💬 Ocultar hilo" if msg.get("permitir_respuestas") else "💬 Responder"
-                    if st.button(lbl_r_toggle, key=f"btn_tgl_resp_{msg['id']}_{idx_m}"):
-                        msg["permitir_respuestas"] = not msg.get("permitir_respuestas", False)
-                        st.rerun()
-
+                # SECCIÓN DE RESPUESTAS HILADAS (SOLO SI SE HABILITÓ AL CREAR LA NOVEDAD)
                 if msg.get("permitir_respuestas", False):
-                    with st.container():
-                        st.markdown("<div style='margin-left: 10px; border-left: 2px solid #374151; padding-left: 8px;'>", unsafe_allow_html=True)
-                        c_r1, c_r2 = st.columns([0.45, 0.55])
-                        with c_r1:
-                            idx_resp_local = LISTA_EMISORES.index(st.session_state.emisor_local) if st.session_state.emisor_local in LISTA_EMISORES else 0
-                            usr_resp = st.selectbox(
-                                "Responde:",
-                                options=LISTA_EMISORES,
-                                index=idx_resp_local,
-                                key=f"sel_usr_resp_{msg['id']}_{idx_m}"
-                            )
-                        with c_r2:
-                            txt_resp = st.text_input(
-                                "Mensaje de respuesta:",
-                                placeholder="Escribe tu respuesta...",
-                                key=f"in_txt_resp_{msg['id']}_{idx_m}",
-                                label_visibility="collapsed"
-                            )
-                        if st.button("Enviado 💬", key=f"btn_send_resp_{msg['id']}_{idx_m}"):
-                            if txt_resp.strip():
-                                msg["respuestas"].append({
-                                    "usuario": usr_resp,
-                                    "texto": txt_resp.strip(),
-                                    "fecha_hora": datetime.now(COT).strftime("%d/%m/%Y %H:%M")
-                                })
-                                st.session_state.emisor_local = usr_resp
-                                st.rerun()
-                        st.markdown("</div>", unsafe_allow_html=True)
+                    mostrar_hilo = msg.get("mostrar_respuestas", False)
+                    c_resp_toggle, _ = st.columns([0.40, 0.60])
+                    with c_resp_toggle:
+                        lbl_r_toggle = "💬 Ocultar hilo" if mostrar_hilo else "💬 Responder"
+                        if st.button(lbl_r_toggle, key=f"btn_tgl_resp_{msg['id']}_{idx_m}"):
+                            msg["mostrar_respuestas"] = not mostrar_hilo
+                            st.rerun()
+
+                    if msg.get("mostrar_respuestas", False):
+                        with st.container():
+                            st.markdown("<div style='margin-left: 10px; border-left: 2px solid #374151; padding-left: 8px;'>", unsafe_allow_html=True)
+                            c_r1, c_r2 = st.columns([0.45, 0.55])
+                            with c_r1:
+                                idx_resp_local = LISTA_EMISORES.index(st.session_state.emisor_local) if st.session_state.emisor_local in LISTA_EMISORES else 0
+                                usr_resp = st.selectbox(
+                                    "Responde:",
+                                    options=LISTA_EMISORES,
+                                    index=idx_resp_local,
+                                    key=f"sel_usr_resp_{msg['id']}_{idx_m}"
+                                )
+                            with c_r2:
+                                txt_resp = st.text_input(
+                                    "Mensaje de respuesta:",
+                                    placeholder="Escribe tu respuesta...",
+                                    key=f"in_txt_resp_{msg['id']}_{idx_m}",
+                                    label_visibility="collapsed"
+                                )
+                            if st.button("Enviado 💬", key=f"btn_send_resp_{msg['id']}_{idx_m}"):
+                                if txt_resp.strip():
+                                    msg["respuestas"].append({
+                                        "usuario": usr_resp,
+                                        "texto": txt_resp.strip(),
+                                        "fecha_hora": datetime.now(COT).strftime("%d/%m/%Y %H:%M")
+                                    })
+                                    st.session_state.emisor_local = usr_resp
+                                    st.rerun()
+                            st.markdown("</div>", unsafe_allow_html=True)
 
                 st.markdown("<div style='margin-bottom: 6px;'></div>", unsafe_allow_html=True)
 
