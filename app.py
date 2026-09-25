@@ -71,7 +71,7 @@ if "alert_filter" not in st.session_state:
 
 
 # ---------------------------------------------------------
-# ESTILOS MODO OSCURO + FIX DE VISIBILIDAD DE INPUTS
+# ESTILOS MODO OSCURO + FIX DE VISIBILIDAD DE INPUTS & TOGGLES
 # ---------------------------------------------------------
 st.markdown(
     """
@@ -159,7 +159,7 @@ st.markdown(
         margin-bottom: 2px;
     }
 
-    /* CONTROLES Y BOTONES GENERALES */
+    /* CONTROLES Y BOTONES GENERALES ESTÁNDAR */
     div.stButton > button {
         background-color: #1E293B !important;
         color: #38BDF8 !important;
@@ -180,26 +180,53 @@ st.markdown(
         box-shadow: 0 0 8px rgba(59, 130, 246, 0.5) !important;
     }
 
-    /* BOTONES DE AUDIO HIGH-CONTRAST NEÓN */
-    .btn-audio-on div.stButton > button {
-        background: linear-gradient(135deg, #10B981 0%, #047857 100%) !important;
+    /* BOTONES ESTILO INTERRUPTOR / PILL TOGGLES (COMO LA IMAGEN) */
+    .pill-toggle-blue div.stButton > button {
+        background: linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%) !important;
         color: #FFFFFF !important;
-        border: 1.5px solid #34D399 !important;
-        border-radius: 20px !important;
+        border: 1px solid #60A5FA !important;
+        border-radius: 30px !important;
         font-size: 11px !important;
         font-weight: 800 !important;
-        height: 28px !important;
-        box-shadow: 0 0 10px rgba(16, 185, 129, 0.5) !important;
+        padding: 2px 10px !important;
+        height: 30px !important;
+        box-shadow: 0 2px 8px rgba(37, 99, 235, 0.4) !important;
     }
-    .btn-audio-off div.stButton > button {
-        background: linear-gradient(135deg, #EF4444 0%, #991B1B 100%) !important;
+    .pill-toggle-blue div.stButton > button:hover {
+        background: linear-gradient(135deg, #3B82F6 0%, #2563EB 100%) !important;
+        box-shadow: 0 0 12px rgba(59, 130, 246, 0.7) !important;
+    }
+
+    .pill-toggle-green div.stButton > button {
+        background: linear-gradient(135deg, #10B981 0%, #059669 100%) !important;
         color: #FFFFFF !important;
-        border: 1.5px solid #F87171 !important;
-        border-radius: 20px !important;
+        border: 1px solid #34D399 !important;
+        border-radius: 30px !important;
         font-size: 11px !important;
         font-weight: 800 !important;
-        height: 28px !important;
-        box-shadow: 0 0 10px rgba(239, 68, 68, 0.5) !important;
+        padding: 2px 10px !important;
+        height: 30px !important;
+        box-shadow: 0 2px 8px rgba(16, 185, 129, 0.4) !important;
+    }
+    .pill-toggle-green div.stButton > button:hover {
+        background: linear-gradient(135deg, #34D399 0%, #10B981 100%) !important;
+        box-shadow: 0 0 12px rgba(52, 211, 153, 0.7) !important;
+    }
+
+    .pill-toggle-red div.stButton > button {
+        background: linear-gradient(135deg, #EF4444 0%, #DC2626 100%) !important;
+        color: #FFFFFF !important;
+        border: 1px solid #F87171 !important;
+        border-radius: 30px !important;
+        font-size: 11px !important;
+        font-weight: 800 !important;
+        padding: 2px 10px !important;
+        height: 30px !important;
+        box-shadow: 0 2px 8px rgba(239, 68, 68, 0.4) !important;
+    }
+    .pill-toggle-red div.stButton > button:hover {
+        background: linear-gradient(135deg, #F87171 0%, #EF4444 100%) !important;
+        box-shadow: 0 0 12px rgba(248, 113, 113, 0.7) !important;
     }
 
     /* SELECTOR SEGMENTADO MODO OSCURO (RADIO BUTTONS) */
@@ -225,7 +252,7 @@ st.markdown(
         transition: all 0.2s ease;
     }
 
-    /* ESTILOS DE MÓDULO CHAT / BITÁCORA Y URGENCIA 4 MINUTOS */
+    /* ESTILOS DE MÓDULO CHAT / BITÁCORA */
     .chat-container {
         max-height: 420px;
         overflow-y: auto;
@@ -291,7 +318,7 @@ st.markdown(
         border: 1px solid #1F2937;
         border-radius: 6px;
         padding: 7px 10px;
-        opacity: 0.9;
+        opacity: 0.95;
     }
 
     .badge-prio-normal {
@@ -313,6 +340,16 @@ st.markdown(
         padding: 1px 5px;
         border-radius: 4px;
         letter-spacing: 0.5px;
+    }
+
+    /* ESTILO DE RESPUESTAS (CHAT SECUNDARIO) */
+    .reply-box {
+        background: #1F2937;
+        border-left: 3px solid #3B82F6;
+        border-radius: 4px;
+        padding: 5px 8px;
+        margin-top: 4px;
+        font-size: 11.5px;
     }
 
     /* ANIMACIÓN PARPADEO TABLA CORRECCIÓN */
@@ -340,7 +377,7 @@ st.markdown(
 )
 
 # ---------------------------------------------------------
-# SISTEMA DE NOTIFICACIONES DE ESCRITORIO Y AUDIO MULTI-PC
+# SISTEMA DE NOTIFICACIONES DE ESCRITORIO MEJORADAS & AUDIO
 # ---------------------------------------------------------
 def solicitar_permisos_notificaciones_js():
     components.html(
@@ -352,7 +389,7 @@ def solicitar_permisos_notificaciones_js():
             if (navNotif) {
                 navNotif.requestPermission().then(function(perm) {
                     if (perm === "granted") {
-                        alert("✅ Notificaciones en segundo plano y Sonido activados con éxito.");
+                        alert("✅ Notificaciones elegantes en segundo plano y Sonido activados con éxito.");
                     } else {
                         alert("⚠️ Debes permitir las notificaciones en el navegador para recibir las alertas flotantes.");
                     }
@@ -372,9 +409,10 @@ def solicitar_permisos_notificaciones_js():
         width=0,
     )
 
-def emitir_notificacion_y_audio_js(msg_id, emisor, prioridad, contenido, sound_enabled):
+def emitir_notificacion_y_audio_js(msg_id, emisor, receptor, prioridad, contenido, sound_enabled):
     contenido_esc = contenido.replace('"', '\\"').replace('\n', ' ')
     emisor_esc = emisor.replace('"', '\\"')
+    receptor_esc = receptor.replace('"', '\\"')
 
     components.html(
         f"""
@@ -390,22 +428,31 @@ def emitir_notificacion_y_audio_js(msg_id, emisor, prioridad, contenido, sound_e
             var msgId = "{msg_id}";
             var prioridad = "{prioridad}";
             var emisor = "{emisor_esc}";
+            var receptor = "{receptor_esc}";
             var contenido = "{contenido_esc}";
             var soundEnabled = {str(sound_enabled).lower()};
 
             if (msgId && !parentWin._processedMsgs[msgId]) {{
                 parentWin._processedMsgs[msgId] = true;
 
-                // 1. NOTIFICACIÓN DE ESCRITORIO EN SEGUNDO PLANO (Cualquier mensaje)
+                // 1. NOTIFICACIÓN DE ESCRITORIO BONITA EN SEGUNDO PLANO
                 if (navNotif && navNotif.permission === "granted") {{
-                    var titulo = (prioridad === 'Urgente' ? "🚨 URGENTE: " : "💬 ") + emisor;
+                    var titulo = (prioridad === 'Urgente') ? "🚨 ¡ALERTA URGENTE DE LABORATORIO!" : "💬 NUEVA NOVEDAD DE BITÁCORA";
+                    var cuerpo = "👤 De: " + emisor + " ➔ Para: " + receptor + "\\n📝 " + contenido;
+                    var icono = (prioridad === 'Urgente') 
+                        ? "https://cdn-icons-png.flaticon.com/512/1827/1827504.png"
+                        : "https://cdn-icons-png.flaticon.com/512/3718/3718167.png";
+
                     try {{
-                        new navNotif(titulo, {{
-                            body: contenido,
-                            icon: "https://cdn-icons-png.flaticon.com/512/1827/1827504.png",
+                        var notif = new navNotif(titulo, {{
+                            body: cuerpo,
+                            icon: icono,
+                            badge: icono,
+                            tag: msgId,
+                            renotify: true,
                             requireInteraction: (prioridad === 'Urgente')
                         }});
-                    }} catch(e) {{ console.error("Error al mostrar notificación:", e); }}
+                    }} catch(e) {{ console.error("Error en notificación:", e); }}
                 }}
 
                 // 2. REPRODUCIR SONIDO SOLO SI ES URGENTE
@@ -506,7 +553,6 @@ def calcular_progreso_orden(row):
     progreso = 25
     cer = str(row.get("Cer firmado", row.get("CER FIRMADO", ""))).strip().upper()
     env = str(row.get("Enviado", row.get("ENVIADO", ""))).strip().upper()
-    crm_sal = str(row.get("CRM salida", row.get("CRM SALIDA", ""))).strip().upper()
 
     faltantes = []
     if cer in ["SI", "SÍ"]:
@@ -519,6 +565,7 @@ def calcular_progreso_orden(row):
     else:
         faltantes.append("Enviado")
 
+    crm_sal = str(row.get("CRM salida", row.get("CRM SALIDA", ""))).strip().upper()
     if crm_sal in ["SI", "SÍ"]:
         progreso += 25
     else:
@@ -642,7 +689,7 @@ def render_dark_table(df_page):
 
 
 # ---------------------------------------------------------
-# RENDERIZADO DE NOVEDADES (BITÁCORA / CHAT)
+# RENDERIZADO DE NOVEDADES (BITÁCORA / CHAT Y RESPUESTAS)
 # ---------------------------------------------------------
 def render_chat_message_html(msg, cycle_sec=0, cycle_num=0):
     emisor = msg.get("emisor", "Jeison Altamar")
@@ -653,6 +700,23 @@ def render_chat_message_html(msg, cycle_sec=0, cycle_num=0):
     estado = msg.get("estado", "Pendiente")
     usuario_enterado = msg.get("usuario_enterado", None)
     fecha_enterado = msg.get("fecha_enterado", None)
+    respuestas = msg.get("respuestas", [])
+
+    # HTML DE RESPUESTAS HILADAS
+    respuestas_html = ""
+    if respuestas:
+        respuestas_html += "<div style='margin-top: 6px; display: flex; flex-direction: column; gap: 4px;'>"
+        for r in respuestas:
+            respuestas_html += f'''
+            <div class="reply-box">
+                <div style="display: flex; justify-content: space-between; font-size: 10px; color: #9CA3AF; margin-bottom: 2px;">
+                    <strong style="color: #60A5FA;">💬 {r.get("usuario")}</strong>
+                    <span>{r.get("fecha_hora")}</span>
+                </div>
+                <div style="color: #E5E7EB;">{r.get("texto")}</div>
+            </div>
+            '''
+        respuestas_html += "</div>"
 
     if prioridad == "Urgente":
         if estado == "Pendiente":
@@ -682,6 +746,7 @@ def render_chat_message_html(msg, cycle_sec=0, cycle_num=0):
                 <div style="color: #FFFFFF; font-size: 12.5px; font-weight: 700; line-height: 1.3; margin-bottom: 4px;">
                     🚨 {contenido}
                 </div>
+                {respuestas_html}
             </div>
             '''
         else:
@@ -689,7 +754,7 @@ def render_chat_message_html(msg, cycle_sec=0, cycle_num=0):
             <div class="msg-card-atendido">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 3px;">
                     <span style="background: rgba(16, 185, 129, 0.2); color: #A7F3D0; border: 1px solid #10B981; font-size: 9.5px; font-weight: 800; padding: 2px 6px; border-radius: 4px;">
-                        ✓ ATENDIDO
+                        ✓ REALIZADO / ATENDIDO
                     </span>
                     <span style="font-size: 10px; color: #9CA3AF;">{fecha_hora}</span>
                 </div>
@@ -700,42 +765,89 @@ def render_chat_message_html(msg, cycle_sec=0, cycle_num=0):
                     {contenido}
                 </div>
                 <div style="font-size: 9.5px; color: #34D399; margin-top: 4px; font-weight: 600;">
-                    ✅ Enterado por: <strong>{usuario_enterado}</strong> a las {fecha_enterado}
+                    ✅ Realizado por: <strong>{usuario_enterado}</strong> a las {fecha_enterado}
                 </div>
+                {respuestas_html}
             </div>
             '''
 
     elif prioridad == "Auditoría":
-        return f'''
-        <div class="msg-card-auditoria">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
-                <span class="badge-prio-auditoria">🟡 AUDITORÍA / CALIDAD</span>
-                <span style="font-size: 10px; color: #FDE68A; font-weight: 700;">🕒 {fecha_hora}</span>
+        if estado == "Atendido":
+            return f'''
+            <div class="msg-card-atendido">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 3px;">
+                    <span style="background: rgba(16, 185, 129, 0.2); color: #A7F3D0; border: 1px solid #10B981; font-size: 9.5px; font-weight: 800; padding: 2px 6px; border-radius: 4px;">
+                        ✓ REALIZADO / AUDITADO
+                    </span>
+                    <span style="font-size: 10px; color: #9CA3AF;">{fecha_hora}</span>
+                </div>
+                <div style="font-size: 11px; color: #9CA3AF; margin-bottom: 2px;">
+                    <strong style="color: #D1D5DB;">De:</strong> {emisor} &nbsp;|&nbsp; <strong style="color: #D1D5DB;">Para:</strong> {receptor}
+                </div>
+                <div style="color: #E5E7EB; font-size: 12px; font-weight: 500; line-height: 1.25;">
+                    {contenido}
+                </div>
+                <div style="font-size: 9.5px; color: #34D399; margin-top: 4px; font-weight: 600;">
+                    ✅ Realizado por: <strong>{usuario_enterado}</strong> a las {fecha_enterado}
+                </div>
+                {respuestas_html}
             </div>
-            <div style="font-size: 11px; color: #9CA3AF; margin-bottom: 4px;">
-                <strong style="color: #F3F4F6;">De:</strong> {emisor} &nbsp;|&nbsp; <strong style="color: #F3F4F6;">Para:</strong> {receptor}
+            '''
+        else:
+            return f'''
+            <div class="msg-card-auditoria">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                    <span class="badge-prio-auditoria">🟡 AUDITORÍA / CALIDAD</span>
+                    <span style="font-size: 10px; color: #FDE68A; font-weight: 700;">🕒 {fecha_hora}</span>
+                </div>
+                <div style="font-size: 11px; color: #9CA3AF; margin-bottom: 4px;">
+                    <strong style="color: #F3F4F6;">De:</strong> {emisor} &nbsp;|&nbsp; <strong style="color: #F3F4F6;">Para:</strong> {receptor}
+                </div>
+                <div style="color: #F3F4F6; font-size: 12px; font-weight: 600; line-height: 1.3;">
+                    {contenido}
+                </div>
+                {respuestas_html}
             </div>
-            <div style="color: #F3F4F6; font-size: 12px; font-weight: 600; line-height: 1.3;">
-                {contenido}
-            </div>
-        </div>
-        '''
+            '''
 
     else:  # Normal
-        return f'''
-        <div class="msg-card-normal">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 3px;">
-                <span class="badge-prio-normal">🟢 NORMAL</span>
-                <span style="font-size: 10px; color: #9CA3AF;">{fecha_hora}</span>
+        if estado == "Atendido":
+            return f'''
+            <div class="msg-card-atendido">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 3px;">
+                    <span style="background: rgba(16, 185, 129, 0.2); color: #A7F3D0; border: 1px solid #10B981; font-size: 9.5px; font-weight: 800; padding: 2px 6px; border-radius: 4px;">
+                        ✓ REALIZADO
+                    </span>
+                    <span style="font-size: 10px; color: #9CA3AF;">{fecha_hora}</span>
+                </div>
+                <div style="font-size: 10.5px; color: #9CA3AF; margin-bottom: 3px;">
+                    <strong style="color: #D1D5DB;">De:</strong> {emisor} &nbsp;|&nbsp; <strong style="color: #D1D5DB;">Para:</strong> {receptor}
+                </div>
+                <div style="color: #F3F4F6; font-size: 12px; font-weight: 500; line-height: 1.25;">
+                    {contenido}
+                </div>
+                <div style="font-size: 9.5px; color: #34D399; margin-top: 4px; font-weight: 600;">
+                    ✅ Realizado por: <strong>{usuario_enterado}</strong> a las {fecha_enterado}
+                </div>
+                {respuestas_html}
             </div>
-            <div style="font-size: 10.5px; color: #9CA3AF; margin-bottom: 3px;">
-                <strong style="color: #D1D5DB;">De:</strong> {emisor} &nbsp;|&nbsp; <strong style="color: #D1D5DB;">Para:</strong> {receptor}
+            '''
+        else:
+            return f'''
+            <div class="msg-card-normal">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 3px;">
+                    <span class="badge-prio-normal">🟢 NORMAL</span>
+                    <span style="font-size: 10px; color: #9CA3AF;">{fecha_hora}</span>
+                </div>
+                <div style="font-size: 10.5px; color: #9CA3AF; margin-bottom: 3px;">
+                    <strong style="color: #D1D5DB;">De:</strong> {emisor} &nbsp;|&nbsp; <strong style="color: #D1D5DB;">Para:</strong> {receptor}
+                </div>
+                <div style="color: #F3F4F6; font-size: 12px; font-weight: 500; line-height: 1.25;">
+                    {contenido}
+                </div>
+                {respuestas_html}
             </div>
-            <div style="color: #F3F4F6; font-size: 12px; font-weight: 500; line-height: 1.25;">
-                {contenido}
-            </div>
-        </div>
-        '''
+            '''
 
 
 # ---------------------------------------------------------
@@ -757,6 +869,13 @@ def render_tablero_fluido():
 
     if "mensajes_bitacora" not in ESTADO_GLOBAL:
         ESTADO_GLOBAL["mensajes_bitacora"] = []
+
+    # MIGRACIÓN DE MENSAGES EXISTENTES
+    for m in ESTADO_GLOBAL["mensajes_bitacora"]:
+        if "permitir_respuestas" not in m:
+            m["permitir_respuestas"] = False
+        if "respuestas" not in m:
+            m["respuestas"] = []
 
     if not ESTADO_GLOBAL.get("cargado_gsheet", False) and df_bitacora is not None and not df_bitacora.empty:
         col_p = next((c for c in df_bitacora.columns if any(k in str(c).upper() for k in ["PRIORI", "PO", "TIPO"])), None)
@@ -780,7 +899,7 @@ def render_tablero_fluido():
                 prio_clean = "Normal"
 
             e_val_raw = str(r[col_e] if col_e else "PENDIENTE").strip().upper()
-            est_clean = "Atendido" if "ATEND" in e_val_raw or "COMPLET" in e_val_raw else "Pendiente"
+            est_clean = "Atendido" if "ATEND" in e_val_raw or "COMPLET" in e_val_raw or "REALIZ" in e_val_raw else "Pendiente"
             
             emisor_raw = str(r[col_em]).strip() if col_em and str(r[col_em]).strip() in LISTA_EMISORES else "Jeison Altamar"
             receptor_raw = str(r[col_rec]).strip() if col_rec and str(r[col_rec]).strip() in LISTA_RECEPTORES else "Todos"
@@ -795,7 +914,9 @@ def render_tablero_fluido():
                 "timestamp": now_ts,
                 "estado": est_clean,
                 "usuario_enterado": None,
-                "fecha_enterado": None
+                "fecha_enterado": None,
+                "permitir_respuestas": False,
+                "respuestas": []
             })
         ESTADO_GLOBAL["cargado_gsheet"] = True
 
@@ -803,11 +924,11 @@ def render_tablero_fluido():
     mensajes_bit = ESTADO_GLOBAL.get("mensajes_bitacora", [])
     if mensajes_bit:
         ultimo_msg = mensajes_bit[0]
-        # Emitir si fue publicado durante o después de cargar la página del usuario
         if ultimo_msg.get("timestamp", 0) >= (st.session_state.session_start_time - 10):
             emitir_notificacion_y_audio_js(
                 msg_id=ultimo_msg.get("id"),
                 emisor=ultimo_msg.get("emisor", "Sistema"),
+                receptor=ultimo_msg.get("receptor", "Todos"),
                 prioridad=ultimo_msg.get("prioridad", "Normal"),
                 contenido=ultimo_msg.get("contenido", ""),
                 sound_enabled=st.session_state.sound_enabled
@@ -820,7 +941,6 @@ def render_tablero_fluido():
     ]
     cant_urgencias_activas = len(urgentes_pendientes)
 
-    # BANNER FLOTANTE SUPERIOR SI HAY URGENCIAS PENDIENTES
     if cant_urgencias_activas > 0:
         st.markdown(
             f'''
@@ -1019,12 +1139,11 @@ def render_tablero_fluido():
                 st.session_state.manual_nav_bonus = 30
                 st.rerun()
 
-        # AL PRESIONAR BOTONES DE FILTRO SE BORRA EL BUSCADOR
         with col_f_todas:
             lbl_todas = "📋 Todas" if st.session_state.alert_filter != "TODAS" else "▶ 📋 Todas"
             if st.button(lbl_todas, key="btn_f_todas"):
                 st.session_state.alert_filter = "TODAS"
-                st.session_state.search_input = ""  # Limpia el buscador
+                st.session_state.search_input = ""
                 st.session_state.page_index = 0
                 st.rerun()
 
@@ -1032,7 +1151,7 @@ def render_tablero_fluido():
             lbl_atasc = f"⚠️ Atascadas ({cant_atascadas})" if st.session_state.alert_filter != "ATASCADAS" else f"▶ ⚠️ Atascadas ({cant_atascadas})"
             if st.button(lbl_atasc, key="btn_f_atasc"):
                 st.session_state.alert_filter = "ATASCADAS"
-                st.session_state.search_input = ""  # Limpia el buscador
+                st.session_state.search_input = ""
                 st.session_state.page_index = 0
                 st.rerun()
 
@@ -1040,11 +1159,10 @@ def render_tablero_fluido():
             lbl_correc = f"🚨 Corrección ({cant_correcciones})" if st.session_state.alert_filter != "CORRECCION" else f"▶ 🚨 Corrección ({cant_correcciones})"
             if st.button(lbl_correc, key="btn_f_correc"):
                 st.session_state.alert_filter = "CORRECCION"
-                st.session_state.search_input = ""  # Limpia el buscador
+                st.session_state.search_input = ""
                 st.session_state.page_index = 0
                 st.rerun()
 
-        # BUSCADOR
         with col_search_box:
             c_in, c_x = st.columns([0.84, 0.16])
             with c_in:
@@ -1213,23 +1331,28 @@ def render_tablero_fluido():
         )
 
     # ---------------------------------------------------------
-    # BITÁCORA DIGITAL DE LABORATORIO (CHAT INTERACTIVO)
+    # BITÁCORA DIGITAL DE LABORATORIO (CHAT INTERACTIVO Y RESPUESTAS)
     # ---------------------------------------------------------
     with c_right:
-        col_b1, col_b2, col_b3 = st.columns([0.45, 0.30, 0.25])
+        col_b1, col_b2, col_b3 = st.columns([0.45, 0.32, 0.23])
         with col_b1:
             st.markdown("<h4 style='margin:0 0 1px 0; font-size:13.5px; color:#F3F4F6;'>📌 Bitácora / Chat</h4>", unsafe_allow_html=True)
             st.caption("Novedades Operativas")
+
+        # BOTONES TIPO INTERRUPTOR / PILL TOGGLES (REDISAÑADOS COMO EN LA IMAGEN)
         with col_b2:
+            st.markdown('<div class="pill-toggle-blue">', unsafe_allow_html=True)
             if st.button("🔔 Permisos", key="btn_permisos_notif", help="Activar alertas flotantes de Windows/Browser"):
                 solicitar_permisos_notificaciones_js()
+            st.markdown('</div>', unsafe_allow_html=True)
+
         with col_b3:
             if st.session_state.sound_enabled:
-                st.markdown('<div class="btn-audio-on">', unsafe_allow_html=True)
+                st.markdown('<div class="pill-toggle-green">', unsafe_allow_html=True)
                 st.button("🔊 ON", on_click=toggle_sonido, key="btn_audio_state_on")
                 st.markdown('</div>', unsafe_allow_html=True)
             else:
-                st.markdown('<div class="btn-audio-off">', unsafe_allow_html=True)
+                st.markdown('<div class="pill-toggle-red">', unsafe_allow_html=True)
                 st.button("🔇 OFF", on_click=toggle_sonido, key="btn_audio_state_off")
                 st.markdown('</div>', unsafe_allow_html=True)
 
@@ -1272,6 +1395,9 @@ def render_tablero_fluido():
                 key="bit_contenido_txt"
             )
 
+            # OPCIÓN PARA PERMITIR RESPUESTAS HILADAS
+            allow_replies = st.checkbox("💬 Permitir respuestas en este mensaje", value=False, key="chk_allow_replies")
+
             if st.button("📤 Publicar Novedad", key="btn_publicar_bitacora"):
                 if contenido_input.strip():
                     now_ts_new = time.time()
@@ -1285,7 +1411,9 @@ def render_tablero_fluido():
                         "timestamp": now_ts_new,
                         "estado": "Pendiente",
                         "usuario_enterado": None,
-                        "fecha_enterado": None
+                        "fecha_enterado": None,
+                        "permitir_respuestas": allow_replies,
+                        "respuestas": []
                     }
                     ESTADO_GLOBAL["mensajes_bitacora"].insert(0, nuevo_msg)
                     st.success("¡Novedad publicada correctamente!")
@@ -1314,9 +1442,25 @@ def render_tablero_fluido():
                 # DIBUJAR TARJETA DE NOVEDAD
                 st.markdown(render_chat_message_html(msg, cycle_sec=c_sec, cycle_num=c_num), unsafe_allow_html=True)
 
-                # BOTONES DE ACCIÓN (ENTERADO / BORRAR)
-                if msg.get("prioridad") == "Urgente" and msg.get("estado") == "Pendiente":
-                    c_ack1, c_ack2, c_del = st.columns([0.45, 0.35, 0.20])
+                # SECCIÓN PARA RESPONDER (SI EL EMISOR LO HABILITÓ)
+                if msg.get("permitir_respuestas", False):
+                    with st.expander("💬 Responder a esta novedad", expanded=False):
+                        r_usr = st.selectbox("Tu Nombre:", options=LISTA_EMISORES, key=f"r_usr_{msg['id']}_{idx_m}")
+                        r_txt = st.text_input("Escribe tu respuesta:", key=f"r_txt_{msg['id']}_{idx_m}", placeholder="Responder...")
+                        if st.button("Enviar Respuesta", key=f"r_btn_{msg['id']}_{idx_m}"):
+                            if r_txt.strip():
+                                if "respuestas" not in msg:
+                                    msg["respuestas"] = []
+                                msg["respuestas"].append({
+                                    "usuario": r_usr,
+                                    "texto": r_txt.strip(),
+                                    "fecha_hora": datetime.now().strftime("%d/%m/%Y %H:%M")
+                                })
+                                st.rerun()
+
+                # BOTONES DE ACCIÓN (REALIZADO / ENTERADO / BORRAR)
+                if msg.get("estado") == "Pendiente":
+                    c_ack1, c_ack2, c_del = st.columns([0.42, 0.38, 0.20])
                     with c_ack1:
                         usr_confirm = st.selectbox(
                             "Confirmar",
@@ -1325,7 +1469,8 @@ def render_tablero_fluido():
                             label_visibility="collapsed"
                         )
                     with c_ack2:
-                        if st.button("✅ Enterado", key=f"btn_enterado_{msg['id']}_{idx_m}"):
+                        lbl_action = "✅ Realizado" if msg.get("prioridad") != "Urgente" else "✅ Enterado"
+                        if st.button(lbl_action, key=f"btn_enterado_{msg['id']}_{idx_m}"):
                             msg["estado"] = "Atendido"
                             msg["usuario_enterado"] = usr_confirm
                             msg["fecha_enterado"] = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
