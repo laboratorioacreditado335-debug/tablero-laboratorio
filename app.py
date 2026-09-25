@@ -1,10 +1,15 @@
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 import time
 import urllib.parse
 import numpy as np
 import pandas as pd
 import streamlit as st
 import streamlit.components.v1 as components
+
+# ---------------------------------------------------------
+# ZONA HORARIA COLOMBIA (UTC-5)
+# ---------------------------------------------------------
+COT = timezone(timedelta(hours=-5))
 
 # ---------------------------------------------------------
 # ID DEL GOOGLE SHEET
@@ -114,6 +119,20 @@ st.markdown(
         color: #FFFFFF !important;
     }
 
+    /* CONTROLES COMPACTOS Y DELGADOS EN BITÁCORA PARA AHORRAR ESPACIO */
+    div[data-testid="stSelectbox"] div[data-baseweb="select"] > div {
+        min-height: 26px !important;
+        height: 26px !important;
+        padding-top: 0px !important;
+        padding-bottom: 0px !important;
+        padding-left: 6px !important;
+        padding-right: 6px !important;
+        font-size: 11px !important;
+    }
+    div[data-testid="stSelectbox"] div[data-baseweb="select"] * {
+        font-size: 11px !important;
+    }
+
     /* BANNER SUPERIOR DE ALERTA CRÍTICA */
     @keyframes pulse-banner {
         0% { box-shadow: 0 0 10px rgba(239, 68, 68, 0.5); }
@@ -170,12 +189,13 @@ st.markdown(
         background-color: #1E293B !important;
         color: #38BDF8 !important;
         border: 1px solid #3B82F6 !important;
-        border-radius: 6px !important;
+        border-radius: 5px !important;
         font-weight: 700 !important;
-        font-size: 12px !important;
-        padding: 2px 6px !important;
+        font-size: 11px !important;
+        padding: 1px 4px !important;
         width: 100% !important;
-        height: 32px !important;
+        height: 26px !important;
+        min-height: 26px !important;
         transition: all 0.2s ease-in-out !important;
     }
     div.stButton > button:hover {
@@ -646,6 +666,26 @@ def render_dark_table(df_page):
 
 
 # ---------------------------------------------------------
+# ORDENAMIENTO DE MENSAJES POR PRIORIDAD Y TIEMPO
+# ---------------------------------------------------------
+def obtener_orden_mensaje(msg):
+    prio_rank = {"Urgente": 1, "Auditoría": 2, "Normal": 3}
+    estado_rank = {"Pendiente": 1, "Atendido": 2}
+
+    st_rank = estado_rank.get(msg.get("estado", "Pendiente"), 1)
+    pr_rank = prio_rank.get(msg.get("prioridad", "Normal"), 3)
+    ts = msg.get("timestamp", 0)
+
+    # Pendientes primero -> ordenados por prioridad (Urgente > Auditoría > Normal)
+    # y luego por timestamp ascendente (el que lleva más tiempo en espera aparece primero)
+    # Atendidos al final -> ordenados por prioridad y luego los más recientes primero
+    if st_rank == 1:
+        return (1, pr_rank, ts)
+    else:
+        return (2, pr_rank, -ts)
+
+
+# ---------------------------------------------------------
 # RENDERIZADO DE NOVEDADES (BITÁCORA / CHAT Y RESPUESTAS)
 # ---------------------------------------------------------
 def render_chat_message_html(msg, cycle_sec=0, cycle_num=0):
@@ -658,6 +698,19 @@ def render_chat_message_html(msg, cycle_sec=0, cycle_num=0):
     usuario_enterado = msg.get("usuario_enterado", None)
     fecha_enterado = msg.get("fecha_enterado", None)
     respuestas = msg.get("respuestas", [])
+
+    # CÁLCULO DE TIEMPO TRANSCURRIDO (DESDE CREACIÓN)
+    now_curr = time.time()
+    ts_msg = msg.get("timestamp", now_curr)
+    elapsed_sec = max(0, int(now_curr - ts_msg))
+    min_elapsed = elapsed_sec // 60
+    if min_elapsed >= 60:
+        hrs = min_elapsed // 60
+        time_elapsed_str = f"⏱️ Hace {hrs}h {min_elapsed % 60}m"
+    elif min_elapsed > 0:
+        time_elapsed_str = f"⏱️ Hace {min_elapsed}m"
+    else:
+        time_elapsed_str = "⏱️ Hace un momento"
 
     # HTML DE RESPUESTAS HILADAS
     respuestas_html = ""
@@ -695,7 +748,7 @@ def render_chat_message_html(msg, cycle_sec=0, cycle_num=0):
             <div class="{card_class}">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
                     {prio_badge}
-                    <span style="font-size: 10px; color: #F3F4F6; font-weight: 700;">⏱️ {fecha_hora}</span>
+                    <span style="font-size: 10px; color: #F3F4F6; font-weight: 700;">{fecha_hora} ({time_elapsed_str})</span>
                 </div>
                 <div style="font-size: 11px; color: #9CA3AF; margin-bottom: 4px;">
                     <strong style="color: #F3F4F6;">De:</strong> {emisor} &nbsp;|&nbsp; <strong style="color: #F3F4F6;">Para:</strong> {receptor}
@@ -755,7 +808,7 @@ def render_chat_message_html(msg, cycle_sec=0, cycle_num=0):
             <div class="msg-card-auditoria">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
                     <span class="badge-prio-auditoria">🟡 AUDITORÍA / CALIDAD</span>
-                    <span style="font-size: 10px; color: #FDE68A; font-weight: 700;">🕒 {fecha_hora}</span>
+                    <span style="font-size: 10px; color: #FDE68A; font-weight: 700;">{fecha_hora} ({time_elapsed_str})</span>
                 </div>
                 <div style="font-size: 11px; color: #9CA3AF; margin-bottom: 4px;">
                     <strong style="color: #F3F4F6;">De:</strong> {emisor} &nbsp;|&nbsp; <strong style="color: #F3F4F6;">Para:</strong> {receptor}
@@ -794,7 +847,7 @@ def render_chat_message_html(msg, cycle_sec=0, cycle_num=0):
             <div class="msg-card-normal">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 3px;">
                     <span class="badge-prio-normal">🟢 NORMAL</span>
-                    <span style="font-size: 10px; color: #9CA3AF;">{fecha_hora}</span>
+                    <span style="font-size: 10px; color: #9CA3AF;">{fecha_hora} ({time_elapsed_str})</span>
                 </div>
                 <div style="font-size: 10.5px; color: #9CA3AF; margin-bottom: 3px;">
                     <strong style="color: #D1D5DB;">De:</strong> {emisor} &nbsp;|&nbsp; <strong style="color: #D1D5DB;">Para:</strong> {receptor}
@@ -819,22 +872,6 @@ def borrar_busqueda():
 # ---------------------------------------------------------
 @st.fragment(run_every=5)
 def render_tablero_fluido():
-    # DESLIZADORES (TOGGLES) NATIVOS EN LA PARTE SUPERIOR
-    col_t1, col_t2, _ = st.columns([0.18, 0.18, 0.64])
-    with col_t1:
-        notif_val = st.toggle("🔔 Notificaciones", value=st.session_state.get("notif_enabled", True), key="toggle_notif_top")
-        if notif_val != st.session_state.get("notif_enabled", True):
-            st.session_state.notif_enabled = notif_val
-            if notif_val:
-                solicitar_permisos_notificaciones_js()
-            st.rerun()
-
-    with col_t2:
-        sound_val = st.toggle("🔊 Sonido", value=st.session_state.get("sound_enabled", True), key="toggle_sound_top")
-        if sound_val != st.session_state.get("sound_enabled", True):
-            st.session_state.sound_enabled = sound_val
-            st.rerun()
-
     df_main, df_bitacora, info_estado = cargar_datos_gsheets()
 
     if "mensajes_bitacora" not in ESTADO_GLOBAL:
@@ -880,7 +917,7 @@ def render_tablero_fluido():
                 "receptor": receptor_raw,
                 "prioridad": prio_clean,
                 "contenido": d_val,
-                "fecha_hora": datetime.now().strftime("%d/%m/%Y %H:%M"),
+                "fecha_hora": datetime.now(COT).strftime("%d/%m/%Y %H:%M"),
                 "timestamp": now_ts,
                 "estado": est_clean,
                 "usuario_enterado": None,
@@ -938,7 +975,7 @@ def render_tablero_fluido():
     df_anteriores_incompletas = pd.DataFrame()
 
     total_hoy = 0
-    hoy_dt = datetime.now().date()
+    hoy_dt = datetime.now(COT).date()
     fecha_activa_str = hoy_dt.strftime("%d/%m/%Y")
 
     total_reg = 0
@@ -1305,8 +1342,23 @@ def render_tablero_fluido():
     # BITÁCORA DIGITAL DE LABORATORIO (CHAT INTERACTIVO Y RESPUESTAS)
     # ---------------------------------------------------------
     with c_right:
-        st.markdown("<h4 style='margin:0 0 1px 0; font-size:13.5px; color:#F3F4F6;'>📌 Bitácora / Chat</h4>", unsafe_allow_html=True)
-        st.caption("Novedades Operativas")
+        # ENCABEZADO CON DESLIZADORES / TOGGLES INTEGRADOS EN LA BITÁCORA
+        c_b_head, c_b_t1, c_b_t2 = st.columns([0.44, 0.28, 0.28])
+        with c_b_head:
+            st.markdown("<h4 style='margin:0 0 1px 0; font-size:13.5px; color:#F3F4F6;'>📌 Bitácora / Chat</h4>", unsafe_allow_html=True)
+            st.caption("Novedades Operativas")
+        with c_b_t1:
+            notif_val = st.toggle("🔔 Notif.", value=st.session_state.get("notif_enabled", True), key="toggle_notif_bit")
+            if notif_val != st.session_state.get("notif_enabled", True):
+                st.session_state.notif_enabled = notif_val
+                if notif_val:
+                    solicitar_permisos_notificaciones_js()
+                st.rerun()
+        with c_b_t2:
+            sound_val = st.toggle("🔊 Sonido", value=st.session_state.get("sound_enabled", True), key="toggle_sound_bit")
+            if sound_val != st.session_state.get("sound_enabled", True):
+                st.session_state.sound_enabled = sound_val
+                st.rerun()
 
         # FORMULARIO PARA REGISTRAR NUEVO MENSAJE
         with st.expander("💬 Registrar Novedad en Bitácora", expanded=False):
@@ -1319,7 +1371,6 @@ def render_tablero_fluido():
                     index=idx_emisor_local,
                     key="bit_emisor_sel"
                 )
-                # Actualizar la memoria de sesión local si cambia la selección
                 if emisor_sel != st.session_state.emisor_local:
                     st.session_state.emisor_local = emisor_sel
 
@@ -1331,96 +1382,72 @@ def render_tablero_fluido():
                     key="bit_receptor_sel"
                 )
 
-            st.markdown("<label style='font-size:11px; font-weight:700; color:#9CA3AF;'>Prioridad del Mensaje:</label>", unsafe_allow_html=True)
-            prio_option = st.radio(
-                "Prioridad",
-                options=["🟢 Normal", "🟡 Auditoría", "🔴 Urgente"],
-                horizontal=True,
-                label_visibility="collapsed",
-                key="bit_prio_radio"
+            prioridad_sel = st.selectbox(
+                "Prioridad:",
+                options=["Normal", "Auditoría", "Urgente"],
+                index=0,
+                key="bit_prioridad_sel"
             )
-
-            prio_clean = "Normal"
-            if "Auditoría" in prio_option:
-                prio_clean = "Auditoría"
-            elif "Urgente" in prio_option:
-                prio_clean = "Urgente"
 
             contenido_input = st.text_area(
-                "Contenido / Novedad:",
-                placeholder="Escriba aquí la novedad u observación...",
+                "Novedad / Mensaje:",
+                placeholder="Escribe el mensaje o indicación...",
                 height=65,
-                key="bit_contenido_txt"
+                key="bit_contenido_input"
             )
 
-            # OPCIÓN PARA PERMITIR RESPUESTAS HILADAS
-            allow_replies = st.checkbox("💬 Permitir respuestas en este mensaje", value=False, key="chk_allow_replies")
-
-            if st.button("📤 Publicar Novedad", key="btn_publicar_bitacora"):
+            if st.button("🚀 Publicar Novedad", key="btn_publicar_bitacora"):
                 if contenido_input.strip():
-                    now_ts_new = time.time()
+                    now_ts_pub = time.time()
                     nuevo_msg = {
-                        "id": f"msg_{int(now_ts_new * 1000)}",
+                        "id": f"msg_{int(now_ts_pub * 1000)}",
                         "emisor": emisor_sel,
                         "receptor": receptor_sel,
-                        "prioridad": prio_clean,
+                        "prioridad": prioridad_sel,
                         "contenido": contenido_input.strip(),
-                        "fecha_hora": datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
-                        "timestamp": now_ts_new,
+                        "fecha_hora": datetime.now(COT).strftime("%d/%m/%Y %H:%M:%S"),
+                        "timestamp": now_ts_pub,
                         "estado": "Pendiente",
                         "usuario_enterado": None,
                         "fecha_enterado": None,
-                        "permitir_respuestas": allow_replies,
+                        "permitir_respuestas": False,
                         "respuestas": []
                     }
                     ESTADO_GLOBAL["mensajes_bitacora"].insert(0, nuevo_msg)
-                    st.success("¡Novedad publicada correctamente!")
+                    st.session_state.emisor_local = emisor_sel
+                    st.success("✅ Novedad registrada.")
                     st.rerun()
                 else:
-                    st.warning("Escriba el contenido antes de enviar.")
+                    st.warning("Escribe un mensaje antes de enviar.")
 
-        # FEED TIPO CHAT DE NOVEDADES
-        st.markdown("<div class='chat-container'>", unsafe_allow_html=True)
-        mensajes = ESTADO_GLOBAL.get("mensajes_bitacora", [])
+        # ORDENAR MENSAJES POR PRIORIDAD Y TIEMPO TRANSCURRIDO
+        ESTADO_GLOBAL["mensajes_bitacora"].sort(key=obtener_orden_mensaje)
 
-        if not mensajes:
-            st.info("Sin mensajes registrados en la Bitácora.")
+        # RENDERIZADO DEL CHAT/BITÁCORA
+        mensajes_lista = ESTADO_GLOBAL.get("mensajes_bitacora", [])
+
+        if not mensajes_lista:
+            st.info("No hay novedades registradas en la bitácora.")
         else:
-            now_curr = time.time()
-            for idx_m, msg in enumerate(mensajes):
-                c_sec = 0
-                c_num = 0
+            st.markdown('<div class="chat-container">', unsafe_allow_html=True)
+            now_ts_curr = time.time()
 
-                if msg.get("prioridad") == "Urgente" and msg.get("estado") == "Pendiente":
-                    ts_start = msg.get("timestamp", now_curr)
-                    elapsed = max(0, now_curr - ts_start)
-                    c_sec = elapsed % 240
-                    c_num = int(elapsed // 240)
+            for idx_m, msg in enumerate(mensajes_lista):
+                t_creacion = msg.get("timestamp", now_ts_curr)
+                diff_sec = now_ts_curr - t_creacion
+                
+                cycle_sec = diff_sec % 240
+                cycle_num = int(diff_sec // 240)
 
-                # DIBUJAR TARJETA DE NOVEDAD
-                st.markdown(render_chat_message_html(msg, cycle_sec=c_sec, cycle_num=c_num), unsafe_allow_html=True)
+                # TARJETA VISUAL DEL MENSAJE
+                st.markdown(
+                    render_chat_message_html(msg, cycle_sec=cycle_sec, cycle_num=cycle_num),
+                    unsafe_allow_html=True
+                )
 
-                # SECCIÓN PARA RESPONDER (SI EL EMISOR LO HABILITÓ)
-                if msg.get("permitir_respuestas", False):
-                    with st.expander("💬 Responder a esta novedad", expanded=False):
-                        idx_reply_local = LISTA_EMISORES.index(st.session_state.emisor_local) if st.session_state.emisor_local in LISTA_EMISORES else 0
-                        r_usr = st.selectbox("Tu Nombre:", options=LISTA_EMISORES, index=idx_reply_local, key=f"r_usr_{msg['id']}_{idx_m}")
-                        r_txt = st.text_input("Escribe tu respuesta:", key=f"r_txt_{msg['id']}_{idx_m}", placeholder="Responder...")
-                        if st.button("Enviar Respuesta", key=f"r_btn_{msg['id']}_{idx_m}"):
-                            if r_txt.strip():
-                                if "respuestas" not in msg:
-                                    msg["respuestas"] = []
-                                msg["respuestas"].append({
-                                    "usuario": r_usr,
-                                    "texto": r_txt.strip(),
-                                    "fecha_hora": datetime.now().strftime("%d/%m/%Y %H:%M")
-                                })
-                                st.session_state.emisor_local = r_usr
-                                st.rerun()
-
-                # BOTONES DE ACCIÓN (REALIZADO / ENTERADO / BORRAR)
+                # ACCIONES COMPACTAS Y DELGADAS (RECIBIDO / REALIZADO)
                 if msg.get("estado") == "Pendiente":
-                    c_ack1, c_ack2, c_del = st.columns([0.42, 0.38, 0.20])
+                    c_ack1, c_ack2, c_del = st.columns([0.48, 0.32, 0.20])
                     with c_ack1:
                         idx_ack_local = LISTA_EMISORES.index(st.session_state.emisor_local) if st.session_state.emisor_local in LISTA_EMISORES else 0
                         usr_confirm = st.selectbox(
@@ -1435,23 +1462,65 @@ def render_tablero_fluido():
                         if st.button(lbl_action, key=f"btn_enterado_{msg['id']}_{idx_m}"):
                             msg["estado"] = "Atendido"
                             msg["usuario_enterado"] = usr_confirm
-                            msg["fecha_enterado"] = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+                            msg["fecha_enterado"] = datetime.now(COT).strftime("%d/%m/%Y %H:%M:%S")
                             st.session_state.emisor_local = usr_confirm
                             st.rerun()
                     with c_del:
                         if st.button("🗑️ Borrar", key=f"btn_del_urg_{msg['id']}_{idx_m}"):
                             ESTADO_GLOBAL["mensajes_bitacora"] = [m for m in ESTADO_GLOBAL["mensajes_bitacora"] if m["id"] != msg["id"]]
                             st.rerun()
+
                 else:
-                    c_spc, c_del = st.columns([0.80, 0.20])
-                    with c_del:
-                        if st.button("🗑️ Borrar", key=f"btn_del_norm_{msg['id']}_{idx_m}"):
+                    c_del_at, _ = st.columns([0.30, 0.70])
+                    with c_del_at:
+                        if st.button("🗑️ Eliminar", key=f"btn_del_atend_{msg['id']}_{idx_m}"):
                             ESTADO_GLOBAL["mensajes_bitacora"] = [m for m in ESTADO_GLOBAL["mensajes_bitacora"] if m["id"] != msg["id"]]
                             st.rerun()
 
-                st.markdown("<div style='margin-bottom: 2px;'></div>", unsafe_allow_html=True)
+                # SECCIÓN DE RESPUESTAS HILADAS
+                c_resp_toggle, _ = st.columns([0.40, 0.60])
+                with c_resp_toggle:
+                    lbl_r_toggle = "💬 Ocultar hilo" if msg.get("permitir_respuestas") else "💬 Responder"
+                    if st.button(lbl_r_toggle, key=f"btn_tgl_resp_{msg['id']}_{idx_m}"):
+                        msg["permitir_respuestas"] = not msg.get("permitir_respuestas", False)
+                        st.rerun()
 
-        st.markdown("</div>", unsafe_allow_html=True)
+                if msg.get("permitir_respuestas", False):
+                    with st.container():
+                        st.markdown("<div style='margin-left: 10px; border-left: 2px solid #374151; padding-left: 8px;'>", unsafe_allow_html=True)
+                        c_r1, c_r2 = st.columns([0.45, 0.55])
+                        with c_r1:
+                            idx_resp_local = LISTA_EMISORES.index(st.session_state.emisor_local) if st.session_state.emisor_local in LISTA_EMISORES else 0
+                            usr_resp = st.selectbox(
+                                "Responde:",
+                                options=LISTA_EMISORES,
+                                index=idx_resp_local,
+                                key=f"sel_usr_resp_{msg['id']}_{idx_m}"
+                            )
+                        with c_r2:
+                            txt_resp = st.text_input(
+                                "Mensaje de respuesta:",
+                                placeholder="Escribe tu respuesta...",
+                                key=f"in_txt_resp_{msg['id']}_{idx_m}",
+                                label_visibility="collapsed"
+                            )
+                        if st.button("Enviado 💬", key=f"btn_send_resp_{msg['id']}_{idx_m}"):
+                            if txt_resp.strip():
+                                msg["respuestas"].append({
+                                    "usuario": usr_resp,
+                                    "texto": txt_resp.strip(),
+                                    "fecha_hora": datetime.now(COT).strftime("%d/%m/%Y %H:%M")
+                                })
+                                st.session_state.emisor_local = usr_resp
+                                st.rerun()
+                        st.markdown("</div>", unsafe_allow_html=True)
+
+                st.markdown("<div style='margin-bottom: 6px;'></div>", unsafe_allow_html=True)
+
+            st.markdown("</div>", unsafe_allow_html=True)
 
 
+# ---------------------------------------------------------
+# EJECUCIÓN PRINCIPAL
+# ---------------------------------------------------------
 render_tablero_fluido()
