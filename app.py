@@ -59,8 +59,6 @@ if "manual_nav_bonus" not in st.session_state:
     st.session_state.manual_nav_bonus = 0
 if "sound_enabled" not in st.session_state:
     st.session_state.sound_enabled = True
-if "notif_enabled" not in st.session_state:
-    st.session_state.notif_enabled = True
 if "session_start_time" not in st.session_state:
     st.session_state.session_start_time = time.time()
 
@@ -73,7 +71,7 @@ if "alert_filter" not in st.session_state:
 
 
 # ---------------------------------------------------------
-# ESTILOS MODO OSCURO + COMPACTACIÓN UI SIN PERDER LA GRACIA
+# ESTILOS MODO OSCURO + FIX DE VISIBILIDAD DE INPUTS & TOGGLES
 # ---------------------------------------------------------
 st.markdown(
     """
@@ -83,11 +81,11 @@ st.markdown(
     .block-container { 
         padding-top: 0.3rem !important; 
         padding-bottom: 0.2rem !important; 
-        padding-left: 0.8rem !important;
-        padding-right: 0.8rem !important;
+        padding-left: 1rem !important;
+        padding-right: 1rem !important;
     }
 
-    .stApp { background-color: #0B1120; color: #F3F4F6; font-size: 13.5px; }
+    .stApp { background-color: #0B1120; color: #F3F4F6; font-size: 14px; }
 
     /* FIX DE VISIBILIDAD EN INPUTS, TEXTAREAS Y SELECTBOXES */
     input, textarea, select {
@@ -99,13 +97,11 @@ st.markdown(
         background-color: #1F2937 !important;
         border: 1px solid #374151 !important;
         border-radius: 6px !important;
-        padding: 4px 8px !important;
     }
     div[data-baseweb="select"] > div {
         background-color: #1F2937 !important;
         color: #FFFFFF !important;
         border: 1px solid #374151 !important;
-        min-height: 32px !important;
     }
     div[data-baseweb="popover"] *, div[role="listbox"] * {
         background-color: #111827 !important;
@@ -121,12 +117,12 @@ st.markdown(
     .top-urgent-banner {
         background: linear-gradient(90deg, #DC2626 0%, #991B1B 100%);
         color: #FFFFFF;
-        padding: 5px 12px;
+        padding: 6px 14px;
         border-radius: 6px;
-        margin-bottom: 6px;
+        margin-bottom: 8px;
         font-weight: 800;
         text-align: center;
-        font-size: 13px;
+        font-size: 13.5px;
         letter-spacing: 0.5px;
         border: 1px solid #EF4444;
         animation: pulse-banner 1.5s infinite;
@@ -140,19 +136,19 @@ st.markdown(
         background-color: #111827;
         border: 1px solid #1F2937;
         border-radius: 6px;
-        padding: 4px 8px;
+        padding: 6px 10px;
         text-align: center;
         box-shadow: 0 2px 5px rgba(0, 0, 0, 0.4);
     }
     .kpi-title {
         color: #9CA3AF;
-        font-size: 10.5px;
+        font-size: 11px;
         font-weight: 700;
         letter-spacing: 0.5px;
         text-transform: uppercase;
         margin-bottom: 1px;
     }
-    .kpi-value { color: #FFFFFF; font-size: 20px; font-weight: 800; line-height: 1.1; }
+    .kpi-value { color: #FFFFFF; font-size: 22px; font-weight: 800; line-height: 1.1; }
 
     /* TARJETAS DE PROGRESO DE ETAPA */
     .progress-order-card {
@@ -168,12 +164,12 @@ st.markdown(
         background-color: #1E293B !important;
         color: #38BDF8 !important;
         border: 1px solid #3B82F6 !important;
-        border-radius: 5px !important;
+        border-radius: 6px !important;
         font-weight: 700 !important;
-        font-size: 11px !important;
-        padding: 1px 5px !important;
+        font-size: 12px !important;
+        padding: 2px 6px !important;
         width: 100% !important;
-        height: 28px !important;
+        height: 32px !important;
         transition: all 0.2s ease-in-out !important;
     }
     div.stButton > button:hover {
@@ -184,16 +180,16 @@ st.markdown(
         box-shadow: 0 0 8px rgba(59, 130, 246, 0.5) !important;
     }
 
-    /* BOTONES ESTILO INTERRUPTOR / PILL TOGGLES */
+    /* BOTONES ESTILO INTERRUPTOR / PILL TOGGLES (COMO LA IMAGEN) */
     .pill-toggle-blue div.stButton > button {
         background: linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%) !important;
         color: #FFFFFF !important;
         border: 1px solid #60A5FA !important;
         border-radius: 30px !important;
-        font-size: 10.5px !important;
+        font-size: 11px !important;
         font-weight: 800 !important;
-        padding: 1px 8px !important;
-        height: 26px !important;
+        padding: 2px 10px !important;
+        height: 30px !important;
         box-shadow: 0 2px 8px rgba(37, 99, 235, 0.4) !important;
     }
     .pill-toggle-blue div.stButton > button:hover {
@@ -206,10 +202,10 @@ st.markdown(
         color: #FFFFFF !important;
         border: 1px solid #34D399 !important;
         border-radius: 30px !important;
-        font-size: 10.5px !important;
+        font-size: 11px !important;
         font-weight: 800 !important;
-        padding: 1px 8px !important;
-        height: 26px !important;
+        padding: 2px 10px !important;
+        height: 30px !important;
         box-shadow: 0 2px 8px rgba(16, 185, 129, 0.4) !important;
     }
     .pill-toggle-green div.stButton > button:hover {
@@ -222,10 +218,10 @@ st.markdown(
         color: #FFFFFF !important;
         border: 1px solid #F87171 !important;
         border-radius: 30px !important;
-        font-size: 10.5px !important;
+        font-size: 11px !important;
         font-weight: 800 !important;
-        padding: 1px 8px !important;
-        height: 26px !important;
+        padding: 2px 10px !important;
+        height: 30px !important;
         box-shadow: 0 2px 8px rgba(239, 68, 68, 0.4) !important;
     }
     .pill-toggle-red div.stButton > button:hover {
@@ -248,29 +244,29 @@ st.markdown(
         text-align: center;
         background-color: #1F2937;
         border-radius: 4px;
-        padding: 2px 4px !important;
-        font-size: 10.5px !important;
+        padding: 3px 6px !important;
+        font-size: 11px !important;
         font-weight: 700 !important;
         color: #D1D5DB !important;
         cursor: pointer;
         transition: all 0.2s ease;
     }
 
-    /* ESTILOS DE MÓDULO CHAT / BITÁCORA REDUCIDO */
+    /* ESTILOS DE MÓDULO CHAT / BITÁCORA */
     .chat-container {
-        max-height: 480px;
+        max-height: 420px;
         overflow-y: auto;
-        padding-right: 3px;
+        padding-right: 4px;
         display: flex;
         flex-direction: column;
-        gap: 4px;
+        gap: 6px;
     }
 
     .msg-card-normal {
         background: #111827;
-        border-left: 3px solid #10B981;
-        border-radius: 5px;
-        padding: 5px 8px;
+        border-left: 4px solid #10B981;
+        border-radius: 6px;
+        padding: 7px 10px;
         border-top: 1px solid #1F2937;
         border-right: 1px solid #1F2937;
         border-bottom: 1px solid #1F2937;
@@ -278,79 +274,82 @@ st.markdown(
 
     .msg-card-auditoria {
         background: #161D2F;
-        border-left: 3px solid #F59E0B;
+        border-left: 4px solid #F59E0B;
         border: 1px solid #F59E0B;
-        border-radius: 5px;
-        padding: 5px 8px;
-        box-shadow: 0 0 6px rgba(245, 158, 11, 0.15);
+        border-radius: 6px;
+        padding: 7px 10px;
+        box-shadow: 0 0 8px rgba(245, 158, 11, 0.2);
     }
 
     /* ESTADOS URGENCIA 4 MINUTOS */
     .msg-card-urgente-verde {
         background: linear-gradient(180deg, #064E3B 0%, #111827 100%);
-        border: 1.5px solid #10B981;
-        border-radius: 5px;
-        padding: 5px 8px;
+        border: 2px solid #10B981;
+        border-radius: 6px;
+        padding: 7px 10px;
+        box-shadow: 0 0 10px rgba(16, 185, 129, 0.4);
     }
 
     .msg-card-urgente-naranja {
         background: linear-gradient(180deg, #78350F 0%, #111827 100%);
-        border: 1.5px solid #F59E0B;
-        border-radius: 5px;
-        padding: 5px 8px;
+        border: 2px solid #F59E0B;
+        border-radius: 6px;
+        padding: 7px 10px;
+        box-shadow: 0 0 12px rgba(245, 158, 11, 0.5);
     }
 
     @keyframes pulse-urgente {
-        0% { border-color: #EF4444; box-shadow: 0 0 4px rgba(239, 68, 68, 0.4); }
-        50% { border-color: #FCA5A5; box-shadow: 0 0 12px rgba(239, 68, 68, 0.8); }
-        100% { border-color: #EF4444; box-shadow: 0 0 4px rgba(239, 68, 68, 0.4); }
+        0% { border-color: #EF4444; box-shadow: 0 0 5px rgba(239, 68, 68, 0.4); }
+        50% { border-color: #FCA5A5; box-shadow: 0 0 16px rgba(239, 68, 68, 0.9); }
+        100% { border-color: #EF4444; box-shadow: 0 0 5px rgba(239, 68, 68, 0.4); }
     }
 
     .msg-card-urgente-rojo {
         background: linear-gradient(180deg, #450A0A 0%, #111827 100%);
-        border: 1.5px solid #EF4444;
+        border: 2px solid #EF4444;
         animation: pulse-urgente 1.2s infinite;
-        border-radius: 5px;
-        padding: 5px 8px;
+        border-radius: 6px;
+        padding: 7px 10px;
     }
 
     .msg-card-atendido {
         background: #0D1520;
-        border-left: 3px solid #10B981;
+        border-left: 4px solid #10B981;
         border: 1px solid #1F2937;
-        border-radius: 5px;
-        padding: 5px 8px;
-        opacity: 0.9;
+        border-radius: 6px;
+        padding: 7px 10px;
+        opacity: 0.95;
     }
 
     .badge-prio-normal {
         background-color: rgba(16, 185, 129, 0.2);
         color: #A7F3D0;
         border: 1px solid #10B981;
-        font-size: 9px;
+        font-size: 10px;
         font-weight: 700;
-        padding: 0px 4px;
-        border-radius: 3px;
+        padding: 1px 5px;
+        border-radius: 4px;
     }
 
     .badge-prio-auditoria {
         background-color: rgba(245, 158, 11, 0.25);
         color: #FDE68A;
         border: 1px solid #F59E0B;
-        font-size: 9px;
+        font-size: 10px;
         font-weight: 800;
-        padding: 0px 4px;
-        border-radius: 3px;
+        padding: 1px 5px;
+        border-radius: 4px;
+        letter-spacing: 0.5px;
     }
 
-    /* ESTILO DE RESPUESTAS */
+    /* ESTILO DE RESPUESTAS (CHAT SECUNDARIO) */
     .reply-box {
         background: #1F2937;
-        border-left: 2px solid #3B82F6;
-        border-radius: 3px;
-        padding: 3px 6px;
-        margin-top: 3px;
-        font-size: 11px;
+        border-left: 3px solid #3B82F6;
+        border-radius: 4px;
+        padding: 5px 8px;
+        margin-top: 4px;
+        font-size: 11.5px;
     }
 
     /* ANIMACIÓN PARPADEO TABLA CORRECCIÓN */
@@ -365,7 +364,7 @@ st.markdown(
     }
 
     /* SCROLLBARS */
-    ::-webkit-scrollbar { width: 5px; height: 5px; }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
     ::-webkit-scrollbar-track { background: #111827; border-radius: 4px; }
     ::-webkit-scrollbar-thumb { background: #374151; border-radius: 4px; }
     ::-webkit-scrollbar-thumb:hover { background: #3B82F6; }
@@ -377,9 +376,8 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-
 # ---------------------------------------------------------
-# SISTEMA DE NOTIFICACIONES DE ESCRITORIO PROFESIONAL
+# SISTEMA DE NOTIFICACIONES DE ESCRITORIO MEJORADAS & AUDIO
 # ---------------------------------------------------------
 def solicitar_permisos_notificaciones_js():
     components.html(
@@ -391,7 +389,7 @@ def solicitar_permisos_notificaciones_js():
             if (navNotif) {
                 navNotif.requestPermission().then(function(perm) {
                     if (perm === "granted") {
-                        alert("✅ Notificaciones del sistema y sonido activados correctamente.");
+                        alert("✅ Notificaciones elegantes en segundo plano y Sonido activados con éxito.");
                     } else {
                         alert("⚠️ Debes permitir las notificaciones en el navegador para recibir las alertas flotantes.");
                     }
@@ -411,11 +409,7 @@ def solicitar_permisos_notificaciones_js():
         width=0,
     )
 
-
-def emitir_notificacion_y_audio_js(msg_id, emisor, receptor, prioridad, contenido, sound_enabled, notif_enabled=True):
-    if not notif_enabled:
-        return
-
+def emitir_notificacion_y_audio_js(msg_id, emisor, receptor, prioridad, contenido, sound_enabled):
     contenido_esc = contenido.replace('"', '\\"').replace('\n', ' ')
     emisor_esc = emisor.replace('"', '\\"')
     receptor_esc = receptor.replace('"', '\\"')
@@ -441,10 +435,10 @@ def emitir_notificacion_y_audio_js(msg_id, emisor, receptor, prioridad, contenid
             if (msgId && !parentWin._processedMsgs[msgId]) {{
                 parentWin._processedMsgs[msgId] = true;
 
-                // 1. NOTIFICACIÓN COMPACTA EN UNA LÍNEA (EVITA DESBORDAMIENTO DE NOMBRES)
+                // 1. NOTIFICACIÓN DE ESCRITORIO BONITA EN SEGUNDO PLANO
                 if (navNotif && navNotif.permission === "granted") {{
-                    var titulo = (prioridad === 'Urgente') ? "🚨 ALERTA DE LABORATORIO" : "💬 BITÁCORA DE CONTROL";
-                    var cuerpo = emisor + " ➔ " + receptor + "\\n📝 " + contenido;
+                    var titulo = (prioridad === 'Urgente') ? "🚨 ¡ALERTA URGENTE DE LABORATORIO!" : "💬 NUEVA NOVEDAD DE BITÁCORA";
+                    var cuerpo = "👤 De: " + emisor + " ➔ Para: " + receptor + "\\n📝 " + contenido;
                     var icono = (prioridad === 'Urgente') 
                         ? "https://cdn-icons-png.flaticon.com/512/1827/1827504.png"
                         : "https://cdn-icons-png.flaticon.com/512/3718/3718167.png";
@@ -453,6 +447,7 @@ def emitir_notificacion_y_audio_js(msg_id, emisor, receptor, prioridad, contenid
                         var notif = new navNotif(titulo, {{
                             body: cuerpo,
                             icon: icono,
+                            badge: icono,
                             tag: msgId,
                             renotify: true,
                             requireInteraction: (prioridad === 'Urgente')
@@ -460,7 +455,7 @@ def emitir_notificacion_y_audio_js(msg_id, emisor, receptor, prioridad, contenid
                     }} catch(e) {{ console.error("Error en notificación:", e); }}
                 }}
 
-                // 2. AUDIO DE ALERTA URGENTE
+                // 2. REPRODUCIR SONIDO SOLO SI ES URGENTE
                 if (prioridad === "Urgente" && soundEnabled) {{
                     try {{
                         var AudioCtx = parentWin.AudioContext || parentWin.webkitAudioContext;
@@ -627,7 +622,7 @@ def cargar_datos_gsheets():
 
 def render_dark_table(df_page):
     if df_page.empty:
-        return "<div style='color: #9CA3AF; text-align: center; padding: 8px; font-size: 12px;'>Sin datos o registros coincidentes.</div>"
+        return "<div style='color: #9CA3AF; text-align: center; padding: 10px; font-size: 13px;'>Sin datos o registros coincidentes.</div>"
 
     headers = list(df_page.columns)
 
@@ -637,13 +632,13 @@ def render_dark_table(df_page):
     col_crm_salida = next((c for c in headers if "CRM" in c.upper() and "SALIDA" in c.upper()), None)
     col_orden = next((c for c in headers if "ORDEN" in c.upper()), None)
 
-    html = '<div style="overflow-x: auto; border: 1px solid #1F2937; border-radius: 6px; background-color: #111827; margin-bottom: 4px;"><table style="width: 100%; border-collapse: collapse; color: #F3F4F6; font-size: 12px; text-align: left;"><thead><tr style="background-color: #1F2937; color: #9CA3AF; font-weight: 700; text-transform: uppercase; font-size: 10.5px; letter-spacing: 0.5px;">'
+    html = '<div style="overflow-x: auto; border: 1px solid #1F2937; border-radius: 6px; background-color: #111827; margin-bottom: 4px;"><table style="width: 100%; border-collapse: collapse; color: #F3F4F6; font-size: 12.5px; text-align: left;"><thead><tr style="background-color: #1F2937; color: #9CA3AF; font-weight: 700; text-transform: uppercase; font-size: 11px; letter-spacing: 0.5px;">'
 
     for h in headers:
         if h == col_resp:
-            html += f'<th style="padding: 4px 4px; border-bottom: 1px solid #374151; width: 75px; text-align: center; white-space: nowrap;">{h}</th>'
+            html += f'<th style="padding: 5px 4px; border-bottom: 1px solid #374151; width: 75px; text-align: center; white-space: nowrap;">{h}</th>'
         else:
-            html += f'<th style="padding: 4px 6px; border-bottom: 1px solid #374151;">{h}</th>'
+            html += f'<th style="padding: 5px 8px; border-bottom: 1px solid #374151;">{h}</th>'
     html += "</tr></thead><tbody>"
 
     for idx, row in df_page.iterrows():
@@ -658,7 +653,7 @@ def render_dark_table(df_page):
         if es_correccion:
             tr_style = 'style="border-bottom: 1px solid #EF4444;" class="row-correccion"'
         elif es_atascada:
-            tr_style = 'style="border-bottom: 1px solid #F59E0B; background-color: rgba(245, 158, 11, 0.08); border-left: 3px solid #F59E0B;"'
+            tr_style = 'style="border-bottom: 1px solid #F59E0B; background-color: rgba(245, 158, 11, 0.08); border-left: 4px solid #F59E0B;"'
         else:
             tr_style = 'style="border-bottom: 1px solid #1F2937;"'
 
@@ -667,20 +662,20 @@ def render_dark_table(df_page):
             val = limpiar_texto(row[h])
             val_upper = val.upper()
 
-            td_style = "padding: 3px 6px;"
+            td_style = "padding: 4px 8px;"
 
             if h == col_resp:
-                td_style = "padding: 3px 4px; text-align: center; width: 75px; white-space: nowrap;"
-                badge = f'<span style="color: #38BDF8; font-weight: 700; font-size: 11px;">{val}</span>'
+                td_style = "padding: 4px 4px; text-align: center; width: 75px; white-space: nowrap;"
+                badge = f'<span style="color: #38BDF8; font-weight: 700; font-size: 11.5px;">{val}</span>'
             elif h == col_orden and es_atascada:
-                badge = f'{val} <span style="background-color: rgba(245, 158, 11, 0.25); color: #FBBF24; border: 1px solid #F59E0B; padding: 0px 4px; border-radius: 3px; font-weight: 700; font-size: 9.5px;" title="Atascada">⚠️</span>'
+                badge = f'{val} <span style="background-color: rgba(245, 158, 11, 0.25); color: #FBBF24; border: 1px solid #F59E0B; padding: 1px 5px; border-radius: 4px; font-weight: 700; font-size: 10px;" title="Certificado firmado pero sin registro de CRM Salida">⚠️ Atascada</span>'
             elif val_upper in ["SI", "SÍ"]:
-                badge = '<span style="background-color: rgba(16, 185, 129, 0.2); color: #A7F3D0; border: 1px solid #10B981; padding: 0px 5px; border-radius: 3px; font-weight: 700; font-size: 10px;">Si</span>'
+                badge = '<span style="background-color: rgba(16, 185, 129, 0.2); color: #A7F3D0; border: 1px solid #10B981; padding: 1px 6px; border-radius: 4px; font-weight: 700; font-size: 10.5px;">Si</span>'
             elif val != "":
                 if any(k in val_upper for k in ["CORREC", "ERROR", "RECHAZ", "CANCEL"]):
-                    badge = f'<span style="background-color: rgba(239, 68, 68, 0.25); color: #FCA5A5; border: 1px solid #EF4444; padding: 0px 5px; border-radius: 3px; font-weight: 700; font-size: 10px;">{val} ⚠️</span>'
+                    badge = f'<span style="background-color: rgba(239, 68, 68, 0.25); color: #FCA5A5; border: 1px solid #EF4444; padding: 1px 6px; border-radius: 4px; font-weight: 700; font-size: 10.5px;">{val} ⚠️</span>'
                 elif h in [col_env, col_crm_salida, col_cer] or any(k in val_upper for k in ["APROBAC", "PENDIENTE", "P.", "FIRMAR", "REVISAR"]):
-                    badge = f'<span style="background-color: rgba(245, 158, 11, 0.2); color: #FDE68A; border: 1px solid #F59E0B; padding: 0px 5px; border-radius: 3px; font-weight: 600; font-size: 10px;">{val}</span>'
+                    badge = f'<span style="background-color: rgba(245, 158, 11, 0.2); color: #FDE68A; border: 1px solid #F59E0B; padding: 1px 6px; border-radius: 4px; font-weight: 600; font-size: 10.5px;">{val}</span>'
                 else:
                     badge = val
             else:
@@ -694,7 +689,7 @@ def render_dark_table(df_page):
 
 
 # ---------------------------------------------------------
-# RENDERIZADO DE NOVEDADES (COMPACTO Y COMPLETO)
+# RENDERIZADO DE NOVEDADES (BITÁCORA / CHAT Y RESPUESTAS)
 # ---------------------------------------------------------
 def render_chat_message_html(msg, cycle_sec=0, cycle_num=0):
     emisor = msg.get("emisor", "Jeison Altamar")
@@ -707,18 +702,18 @@ def render_chat_message_html(msg, cycle_sec=0, cycle_num=0):
     fecha_enterado = msg.get("fecha_enterado", None)
     respuestas = msg.get("respuestas", [])
 
-    # RESPUESTAS HILADAS
+    # HTML DE RESPUESTAS HILADAS
     respuestas_html = ""
     if respuestas:
-        respuestas_html += "<div style='margin-top: 3px; display: flex; flex-direction: column; gap: 2px;'>"
+        respuestas_html += "<div style='margin-top: 6px; display: flex; flex-direction: column; gap: 4px;'>"
         for r in respuestas:
             respuestas_html += f'''
             <div class="reply-box">
-                <div style="display: flex; justify-content: space-between; font-size: 9px; color: #9CA3AF; margin-bottom: 1px;">
+                <div style="display: flex; justify-content: space-between; font-size: 10px; color: #9CA3AF; margin-bottom: 2px;">
                     <strong style="color: #60A5FA;">💬 {r.get("usuario")}</strong>
                     <span>{r.get("fecha_hora")}</span>
                 </div>
-                <div style="color: #E5E7EB; font-size: 11px; line-height: 1.2;">{r.get("texto")}</div>
+                <div style="color: #E5E7EB;">{r.get("texto")}</div>
             </div>
             '''
         respuestas_html += "</div>"
@@ -727,28 +722,28 @@ def render_chat_message_html(msg, cycle_sec=0, cycle_num=0):
         if estado == "Pendiente":
             min_exp = int(cycle_sec // 60)
             sec_exp = int(cycle_sec % 60)
-            c_num_str = f" | C#{cycle_num + 1}" if cycle_num > 0 else ""
+            c_num_str = f" | Ciclo #{cycle_num + 1}" if cycle_num > 0 else ""
 
             if cycle_sec < 120:
                 card_class = "msg-card-urgente-verde"
-                prio_badge = f'<span style="background: rgba(16, 185, 129, 0.25); color: #A7F3D0; border: 1px solid #10B981; font-size: 9px; font-weight: 800; padding: 1px 4px; border-radius: 3px;">🟢 URGENTE ({min_exp}m {sec_exp:02d}s{c_num_str})</span>'
+                prio_badge = f'<span style="background: rgba(16, 185, 129, 0.25); color: #A7F3D0; border: 1px solid #10B981; font-size: 10px; font-weight: 800; padding: 2px 6px; border-radius: 4px;">🟢 URGENTE ({min_exp}m {sec_exp:02d}s{c_num_str})</span>'
             elif cycle_sec < 180:
                 card_class = "msg-card-urgente-naranja"
-                prio_badge = f'<span style="background: rgba(245, 158, 11, 0.25); color: #FDE68A; border: 1px solid #F59E0B; font-size: 9px; font-weight: 800; padding: 1px 4px; border-radius: 3px;">🟡 ADVERTENCIA ({min_exp}m {sec_exp:02d}s{c_num_str})</span>'
+                prio_badge = f'<span style="background: rgba(245, 158, 11, 0.25); color: #FDE68A; border: 1px solid #F59E0B; font-size: 10px; font-weight: 800; padding: 2px 6px; border-radius: 4px;">🟡 ADVERTENCIA ({min_exp}m {sec_exp:02d}s{c_num_str})</span>'
             else:
                 card_class = "msg-card-urgente-rojo"
-                prio_badge = f'<span style="background: rgba(239, 68, 68, 0.35); color: #FCA5A5; border: 1px solid #EF4444; font-size: 9px; font-weight: 800; padding: 1px 4px; border-radius: 3px;">🔴 CRÍTICO ({min_exp}m {sec_exp:02d}s{c_num_str})</span>'
+                prio_badge = f'<span style="background: rgba(239, 68, 68, 0.35); color: #FCA5A5; border: 1px solid #EF4444; font-size: 10px; font-weight: 800; padding: 2px 6px; border-radius: 4px;">🔴 CRÍTICO / RE-ALERTA ({min_exp}m {sec_exp:02d}s{c_num_str})</span>'
 
             return f'''
             <div class="{card_class}">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
                     {prio_badge}
-                    <span style="font-size: 9.5px; color: #F3F4F6; font-weight: 700;">⏱️ {fecha_hora}</span>
+                    <span style="font-size: 10px; color: #F3F4F6; font-weight: 700;">⏱️ {fecha_hora}</span>
                 </div>
-                <div style="font-size: 10.5px; color: #9CA3AF; margin-bottom: 2px;">
-                    <strong style="color: #F3F4F6;">{emisor}</strong> ➔ <strong style="color: #F3F4F6;">{receptor}</strong>
+                <div style="font-size: 11px; color: #9CA3AF; margin-bottom: 4px;">
+                    <strong style="color: #F3F4F6;">De:</strong> {emisor} &nbsp;|&nbsp; <strong style="color: #F3F4F6;">Para:</strong> {receptor}
                 </div>
-                <div style="color: #FFFFFF; font-size: 11.5px; font-weight: 700; line-height: 1.25; margin-bottom: 2px;">
+                <div style="color: #FFFFFF; font-size: 12.5px; font-weight: 700; line-height: 1.3; margin-bottom: 4px;">
                     🚨 {contenido}
                 </div>
                 {respuestas_html}
@@ -757,20 +752,20 @@ def render_chat_message_html(msg, cycle_sec=0, cycle_num=0):
         else:
             return f'''
             <div class="msg-card-atendido">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px;">
-                    <span style="background: rgba(16, 185, 129, 0.2); color: #A7F3D0; border: 1px solid #10B981; font-size: 9px; font-weight: 800; padding: 1px 4px; border-radius: 3px;">
-                        ✓ REALIZADO
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 3px;">
+                    <span style="background: rgba(16, 185, 129, 0.2); color: #A7F3D0; border: 1px solid #10B981; font-size: 9.5px; font-weight: 800; padding: 2px 6px; border-radius: 4px;">
+                        ✓ REALIZADO / ATENDIDO
                     </span>
-                    <span style="font-size: 9.5px; color: #9CA3AF;">{fecha_hora}</span>
+                    <span style="font-size: 10px; color: #9CA3AF;">{fecha_hora}</span>
                 </div>
-                <div style="font-size: 10.5px; color: #9CA3AF; margin-bottom: 2px;">
-                    <strong style="color: #D1D5DB;">{emisor}</strong> ➔ <strong style="color: #D1D5DB;">{receptor}</strong>
+                <div style="font-size: 11px; color: #9CA3AF; margin-bottom: 2px;">
+                    <strong style="color: #D1D5DB;">De:</strong> {emisor} &nbsp;|&nbsp; <strong style="color: #D1D5DB;">Para:</strong> {receptor}
                 </div>
-                <div style="color: #E5E7EB; font-size: 11.5px; font-weight: 500; line-height: 1.2;">
+                <div style="color: #E5E7EB; font-size: 12px; font-weight: 500; line-height: 1.25;">
                     {contenido}
                 </div>
-                <div style="font-size: 9px; color: #34D399; margin-top: 2px; font-weight: 600;">
-                    ✅ Realizado por: <strong>{usuario_enterado}</strong> ({fecha_enterado})
+                <div style="font-size: 9.5px; color: #34D399; margin-top: 4px; font-weight: 600;">
+                    ✅ Realizado por: <strong>{usuario_enterado}</strong> a las {fecha_enterado}
                 </div>
                 {respuestas_html}
             </div>
@@ -780,20 +775,20 @@ def render_chat_message_html(msg, cycle_sec=0, cycle_num=0):
         if estado == "Atendido":
             return f'''
             <div class="msg-card-atendido">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px;">
-                    <span style="background: rgba(16, 185, 129, 0.2); color: #A7F3D0; border: 1px solid #10B981; font-size: 9px; font-weight: 800; padding: 1px 4px; border-radius: 3px;">
-                        ✓ AUDITADO
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 3px;">
+                    <span style="background: rgba(16, 185, 129, 0.2); color: #A7F3D0; border: 1px solid #10B981; font-size: 9.5px; font-weight: 800; padding: 2px 6px; border-radius: 4px;">
+                        ✓ REALIZADO / AUDITADO
                     </span>
-                    <span style="font-size: 9.5px; color: #9CA3AF;">{fecha_hora}</span>
+                    <span style="font-size: 10px; color: #9CA3AF;">{fecha_hora}</span>
                 </div>
-                <div style="font-size: 10.5px; color: #9CA3AF; margin-bottom: 2px;">
-                    <strong style="color: #D1D5DB;">{emisor}</strong> ➔ <strong style="color: #D1D5DB;">{receptor}</strong>
+                <div style="font-size: 11px; color: #9CA3AF; margin-bottom: 2px;">
+                    <strong style="color: #D1D5DB;">De:</strong> {emisor} &nbsp;|&nbsp; <strong style="color: #D1D5DB;">Para:</strong> {receptor}
                 </div>
-                <div style="color: #E5E7EB; font-size: 11.5px; font-weight: 500; line-height: 1.2;">
+                <div style="color: #E5E7EB; font-size: 12px; font-weight: 500; line-height: 1.25;">
                     {contenido}
                 </div>
-                <div style="font-size: 9px; color: #34D399; margin-top: 2px; font-weight: 600;">
-                    ✅ Auditado por: <strong>{usuario_enterado}</strong> ({fecha_enterado})
+                <div style="font-size: 9.5px; color: #34D399; margin-top: 4px; font-weight: 600;">
+                    ✅ Realizado por: <strong>{usuario_enterado}</strong> a las {fecha_enterado}
                 </div>
                 {respuestas_html}
             </div>
@@ -801,14 +796,14 @@ def render_chat_message_html(msg, cycle_sec=0, cycle_num=0):
         else:
             return f'''
             <div class="msg-card-auditoria">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px;">
-                    <span class="badge-prio-auditoria">AUDITORÍA</span>
-                    <span style="font-size: 9.5px; color: #9CA3AF;">{fecha_hora}</span>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                    <span class="badge-prio-auditoria">🟡 AUDITORÍA / CALIDAD</span>
+                    <span style="font-size: 10px; color: #FDE68A; font-weight: 700;">🕒 {fecha_hora}</span>
                 </div>
-                <div style="font-size: 10.5px; color: #9CA3AF; margin-bottom: 2px;">
-                    <strong style="color: #D1D5DB;">{emisor}</strong> ➔ <strong style="color: #D1D5DB;">{receptor}</strong>
+                <div style="font-size: 11px; color: #9CA3AF; margin-bottom: 4px;">
+                    <strong style="color: #F3F4F6;">De:</strong> {emisor} &nbsp;|&nbsp; <strong style="color: #F3F4F6;">Para:</strong> {receptor}
                 </div>
-                <div style="color: #E5E7EB; font-size: 11.5px; font-weight: 500; line-height: 1.2;">
+                <div style="color: #F3F4F6; font-size: 12px; font-weight: 600; line-height: 1.3;">
                     {contenido}
                 </div>
                 {respuestas_html}
@@ -819,20 +814,20 @@ def render_chat_message_html(msg, cycle_sec=0, cycle_num=0):
         if estado == "Atendido":
             return f'''
             <div class="msg-card-atendido">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px;">
-                    <span style="background: rgba(16, 185, 129, 0.2); color: #A7F3D0; border: 1px solid #10B981; font-size: 9px; font-weight: 800; padding: 1px 4px; border-radius: 3px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 3px;">
+                    <span style="background: rgba(16, 185, 129, 0.2); color: #A7F3D0; border: 1px solid #10B981; font-size: 9.5px; font-weight: 800; padding: 2px 6px; border-radius: 4px;">
                         ✓ REALIZADO
                     </span>
-                    <span style="font-size: 9.5px; color: #9CA3AF;">{fecha_hora}</span>
+                    <span style="font-size: 10px; color: #9CA3AF;">{fecha_hora}</span>
                 </div>
-                <div style="font-size: 10.5px; color: #9CA3AF; margin-bottom: 2px;">
-                    <strong style="color: #D1D5DB;">{emisor}</strong> ➔ <strong style="color: #D1D5DB;">{receptor}</strong>
+                <div style="font-size: 10.5px; color: #9CA3AF; margin-bottom: 3px;">
+                    <strong style="color: #D1D5DB;">De:</strong> {emisor} &nbsp;|&nbsp; <strong style="color: #D1D5DB;">Para:</strong> {receptor}
                 </div>
-                <div style="color: #E5E7EB; font-size: 11.5px; font-weight: 500; line-height: 1.2;">
+                <div style="color: #F3F4F6; font-size: 12px; font-weight: 500; line-height: 1.25;">
                     {contenido}
                 </div>
-                <div style="font-size: 9px; color: #34D399; margin-top: 2px; font-weight: 600;">
-                    ✅ Realizado por: <strong>{usuario_enterado}</strong> ({fecha_enterado})
+                <div style="font-size: 9.5px; color: #34D399; margin-top: 4px; font-weight: 600;">
+                    ✅ Realizado por: <strong>{usuario_enterado}</strong> a las {fecha_enterado}
                 </div>
                 {respuestas_html}
             </div>
@@ -840,14 +835,14 @@ def render_chat_message_html(msg, cycle_sec=0, cycle_num=0):
         else:
             return f'''
             <div class="msg-card-normal">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px;">
-                    <span class="badge-prio-normal">NORMAL</span>
-                    <span style="font-size: 9.5px; color: #9CA3AF;">{fecha_hora}</span>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 3px;">
+                    <span class="badge-prio-normal">🟢 NORMAL</span>
+                    <span style="font-size: 10px; color: #9CA3AF;">{fecha_hora}</span>
                 </div>
-                <div style="font-size: 10.5px; color: #9CA3AF; margin-bottom: 2px;">
-                    <strong style="color: #D1D5DB;">{emisor}</strong> ➔ <strong style="color: #D1D5DB;">{receptor}</strong>
+                <div style="font-size: 10.5px; color: #9CA3AF; margin-bottom: 3px;">
+                    <strong style="color: #D1D5DB;">De:</strong> {emisor} &nbsp;|&nbsp; <strong style="color: #D1D5DB;">Para:</strong> {receptor}
                 </div>
-                <div style="color: #E5E7EB; font-size: 11.5px; font-weight: 500; line-height: 1.2;">
+                <div style="color: #F3F4F6; font-size: 12px; font-weight: 500; line-height: 1.25;">
                     {contenido}
                 </div>
                 {respuestas_html}
@@ -856,152 +851,644 @@ def render_chat_message_html(msg, cycle_sec=0, cycle_num=0):
 
 
 # ---------------------------------------------------------
-# INTERFAZ PRINCIPAL
+# CALLBACKS
 # ---------------------------------------------------------
-df_proceso, df_notas, status_msg = cargar_datos_gsheets()
+def borrar_busqueda():
+    st.session_state.search_input = ""
 
-# ENCABEZADO CON TOGGLES SOLICITADOS
-col_head1, col_head2, col_head3 = st.columns([0.6, 0.2, 0.2])
+def toggle_sonido():
+    st.session_state.sound_enabled = not st.session_state.sound_enabled
 
-with col_head1:
-    st.markdown("<h3 style='margin: 0; color: #F3F4F6;'>📌 Bitácora / Chat de Laboratorio</h3>", unsafe_allow_html=True)
 
-with col_head2:
-    st.session_state.notif_enabled = st.toggle("🔔 Notificaciones", value=st.session_state.notif_enabled)
+# ---------------------------------------------------------
+# TABLERO DE CONTROL DINÁMICO
+# ---------------------------------------------------------
+@st.fragment(run_every=5)
+def render_tablero_fluido():
+    df_main, df_bitacora, info_estado = cargar_datos_gsheets()
 
-with col_head3:
-    st.session_state.sound_enabled = st.toggle("🔊 Sonido", value=st.session_state.sound_enabled)
+    if "mensajes_bitacora" not in ESTADO_GLOBAL:
+        ESTADO_GLOBAL["mensajes_bitacora"] = []
 
-st.divider()
+    # MIGRACIÓN DE MENSAGES EXISTENTES
+    for m in ESTADO_GLOBAL["mensajes_bitacora"]:
+        if "permitir_respuestas" not in m:
+            m["permitir_respuestas"] = False
+        if "respuestas" not in m:
+            m["respuestas"] = []
 
-# LAYOUT DUAL
-col_left, col_right = st.columns([1.1, 0.9])
+    if not ESTADO_GLOBAL.get("cargado_gsheet", False) and df_bitacora is not None and not df_bitacora.empty:
+        col_p = next((c for c in df_bitacora.columns if any(k in str(c).upper() for k in ["PRIORI", "PO", "TIPO"])), None)
+        col_d = next((c for c in df_bitacora.columns if any(k in str(c).upper() for k in ["DESCRIP", "NOTA", "AVISO"])), None)
+        col_e = next((c for c in df_bitacora.columns if "ESTADO" in str(c).upper()), None)
+        col_em = next((c for c in df_bitacora.columns if "DE" in str(c).upper() or "EMISOR" in str(c).upper()), None)
+        col_rec = next((c for c in df_bitacora.columns if "PARA" in str(c).upper() or "RECEPTOR" in str(c).upper()), None)
 
-with col_left:
-    st.markdown("##### 📊 Control de Órdenes")
+        now_ts = time.time()
+        for idx_b, r in df_bitacora.iterrows():
+            d_val = str(r[col_d] if col_d else "").strip()
+            if not d_val:
+                continue
+            
+            p_val_raw = str(r[col_p] if col_p else "NORMAL").strip().upper()
+            if "URG" in p_val_raw:
+                prio_clean = "Urgente"
+            elif "AUD" in p_val_raw or "CALID" in p_val_raw:
+                prio_clean = "Auditoría"
+            else:
+                prio_clean = "Normal"
 
-    if df_proceso is not None and not df_proceso.empty:
-        st.session_state.search_input = st.text_input(
-            "🔎 Buscar por Orden, Responsable o Estado:", value=st.session_state.search_input, key="input_search_main"
-        )
+            e_val_raw = str(r[col_e] if col_e else "PENDIENTE").strip().upper()
+            est_clean = "Atendido" if "ATEND" in e_val_raw or "COMPLET" in e_val_raw or "REALIZ" in e_val_raw else "Pendiente"
+            
+            emisor_raw = str(r[col_em]).strip() if col_em and str(r[col_em]).strip() in LISTA_EMISORES else "Jeison Altamar"
+            receptor_raw = str(r[col_rec]).strip() if col_rec and str(r[col_rec]).strip() in LISTA_RECEPTORES else "Todos"
 
-        df_filtered = df_proceso.copy()
-        if st.session_state.search_input:
-            term = st.session_state.search_input.upper()
-            df_filtered = df_filtered[
-                df_filtered.apply(lambda row: term in " ".join(row.astype(str)).upper(), axis=1)
-            ]
-
-        items_per_page = 10
-        total_pages = max(1, int(np.ceil(len(df_filtered) / items_per_page)))
-        
-        col_p1, col_p2 = st.columns([0.5, 0.5])
-        with col_p1:
-            st.caption(f"Página {st.session_state.page_index + 1} de {total_pages} ({len(df_filtered)} reg.)")
-        with col_p2:
-            if total_pages > 1:
-                page_sel = st.selectbox("Página:", list(range(1, total_pages + 1)), index=st.session_state.page_index)
-                st.session_state.page_index = page_sel - 1
-
-        start_idx = st.session_state.page_index * items_per_page
-        df_page = df_filtered.iloc[start_idx : start_idx + items_per_page]
-
-        st.markdown(render_dark_table(df_page), unsafe_allow_html=True)
-    else:
-        st.warning("Cargando datos...")
-
-with col_right:
-    st.markdown("##### 📝 Novedades Operativas")
-
-    with st.form("form_publicar_novedad", clear_on_submit=True):
-        col_f1, col_f2 = st.columns(2)
-        with col_f1:
-            emisor_sel = st.selectbox("De:", LISTA_EMISORES, index=0)
-        with col_f2:
-            receptor_sel = st.selectbox("Para:", LISTA_RECEPTORES, index=0)
-
-        prio_sel = st.radio("Prioridad del Mensaje:", ["Normal", "Auditoría", "Urgente"], horizontal=True)
-        texto_msg = st.text_area("Contenido / Novedad:", height=60, placeholder="Escribe el mensaje aquí...")
-
-        btn_publicar = st.form_submit_button("🚀 Publicar Novedad")
-
-        if btn_publicar and texto_msg.strip():
-            nuevo_id = f"msg_{int(time.time()*1000)}"
-            nuevo_msg = {
-                "id": nuevo_id,
-                "emisor": emisor_sel,
-                "receptor": receptor_sel,
-                "prioridad": prio_sel,
-                "contenido": texto_msg.strip(),
-                "fecha_hora": datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
-                "timestamp": time.time(),
-                "estado": "Pendiente",
+            ESTADO_GLOBAL["mensajes_bitacora"].append({
+                "id": f"gs_{idx_b}_{int(now_ts)}",
+                "emisor": emisor_raw,
+                "receptor": receptor_raw,
+                "prioridad": prio_clean,
+                "contenido": d_val,
+                "fecha_hora": datetime.now().strftime("%d/%m/%Y %H:%M"),
+                "timestamp": now_ts,
+                "estado": est_clean,
                 "usuario_enterado": None,
                 "fecha_enterado": None,
-                "respuestas": [],
-            }
-            ESTADO_GLOBAL["mensajes_bitacora"].insert(0, nuevo_msg)
+                "permitir_respuestas": False,
+                "respuestas": []
+            })
+        ESTADO_GLOBAL["cargado_gsheet"] = True
+
+    # VERIFICAR Y DISPARAR NOTIFICACIONES Y SONIDOS A CADA NAVEGADOR ABIERTO
+    mensajes_bit = ESTADO_GLOBAL.get("mensajes_bitacora", [])
+    if mensajes_bit:
+        ultimo_msg = mensajes_bit[0]
+        if ultimo_msg.get("timestamp", 0) >= (st.session_state.session_start_time - 10):
             emitir_notificacion_y_audio_js(
-                nuevo_id,
-                emisor_sel,
-                receptor_sel,
-                prio_sel,
-                texto_msg.strip(),
-                st.session_state.sound_enabled,
-                st.session_state.notif_enabled,
+                msg_id=ultimo_msg.get("id"),
+                emisor=ultimo_msg.get("emisor", "Sistema"),
+                receptor=ultimo_msg.get("receptor", "Todos"),
+                prioridad=ultimo_msg.get("prioridad", "Normal"),
+                contenido=ultimo_msg.get("contenido", ""),
+                sound_enabled=st.session_state.sound_enabled
             )
+
+    # EVALUACIÓN DE MENSAJES URGENTES PENDIENTES
+    urgentes_pendientes = [
+        m for m in ESTADO_GLOBAL["mensajes_bitacora"]
+        if m.get("prioridad") == "Urgente" and m.get("estado") == "Pendiente"
+    ]
+    cant_urgencias_activas = len(urgentes_pendientes)
+
+    if cant_urgencias_activas > 0:
+        st.markdown(
+            f'''
+            <div class="top-urgent-banner">
+                <span>🚨 ATENCIÓN INMEDIATA: Hay {cant_urgencias_activas} novedad(es) URGENTE(S) sin atender en la Bitácora.</span>
+                <span style="font-size: 11px; background: rgba(0,0,0,0.3); padding: 2px 8px; border-radius: 4px;">Atender abajo en Bitácora ⬇️</span>
+            </div>
+            ''',
+            unsafe_allow_html=True
+        )
+
+    cols_deseadas = [
+        "Fecha",
+        "# Orden",
+        "Responsables",
+        "Cer firmado",
+        "Enviado",
+        "CRM salida",
+        "Aprob. Comercial",
+        "CRM cert.",
+    ]
+    df_vista = pd.DataFrame()
+    df_hoy = pd.DataFrame()
+    df_anteriores_incompletas = pd.DataFrame()
+
+    total_hoy = 0
+    hoy_dt = datetime.now().date()
+    fecha_activa_str = hoy_dt.strftime("%d/%m/%Y")
+
+    total_reg = 0
+    total_firm = 0
+    total_env = 0
+    total_pend = 0
+    cant_atascadas = 0
+    cant_correcciones = 0
+
+    if df_main is not None and not df_main.empty:
+        mapa_cols = {}
+        cols_raw = list(df_main.columns)
+
+        for idx, col in enumerate(cols_raw):
+            c_upper = str(col).upper().strip()
+            if "FECHA" in c_upper and "Fecha" not in mapa_cols.values():
+                mapa_cols[col] = "Fecha"
+            elif (("ORDEN" in c_upper or "ORD" in c_upper) and "# Orden" not in mapa_cols.values()):
+                mapa_cols[col] = "# Orden"
+            elif (("RESP" in c_upper or "RESPONSABLE" in c_upper or "ENCARGADO" in c_upper) and "Responsables" not in mapa_cols.values()):
+                mapa_cols[col] = "Responsables"
+            elif ("CER" in c_upper and "FIRM" in c_upper) and "Cer firmado" not in mapa_cols.values():
+                mapa_cols[col] = "Cer firmado"
+            elif "ENV" in c_upper and "Enviado" not in mapa_cols.values():
+                mapa_cols[col] = "Enviado"
+            elif ("CRM" in c_upper and "SAL" in c_upper) and "CRM salida" not in mapa_cols.values():
+                mapa_cols[col] = "CRM salida"
+            elif (("APROB" in c_upper or "COMER" in c_upper) and "Aprob. Comercial" not in mapa_cols.values()):
+                mapa_cols[col] = "Aprob. Comercial"
+            elif ("CRM" in c_upper and "CERT" in c_upper) and "CRM cert." not in mapa_cols.values():
+                mapa_cols[col] = "CRM cert."
+
+        if "Responsables" not in mapa_cols.values() and len(cols_raw) >= 3:
+            col_pos2 = cols_raw[2]
+            if col_pos2 not in mapa_cols:
+                mapa_cols[col_pos2] = "Responsables"
+
+        df_renamed = df_main.rename(columns=mapa_cols)
+
+        if "Fecha" not in df_renamed.columns and len(df_renamed.columns) > 0:
+            df_renamed.rename(columns={df_renamed.columns[0]: "Fecha"}, inplace=True)
+
+        cols_existentes = [c for c in cols_deseadas if c in df_renamed.columns]
+        df_vista = df_renamed[cols_existentes].copy()
+
+        col_ord_main = (
+            "# Orden"
+            if "# Orden" in df_vista.columns
+            else cols_existentes[min(1, len(cols_existentes) - 1)]
+        )
+
+        if "Fecha" in df_vista.columns:
+            df_vista["Fecha_Raw"] = df_vista["Fecha"].astype(str).str.strip()
+            df_vista["Fecha_Raw"] = df_vista["Fecha_Raw"].replace(
+                ["", "nan", "none", "null", "nat", "NaN", "None", "#ERROR!", "#N/A", "#VALOR!"],
+                np.nan,
+            )
+            df_vista["Fecha_Raw"] = df_vista["Fecha_Raw"].ffill()
+
+        df_vista[col_ord_main] = df_vista[col_ord_main].apply(limpiar_texto)
+        df_vista = df_vista[
+            df_vista[col_ord_main].notna()
+            & (df_vista[col_ord_main] != "")
+            & (~df_vista[col_ord_main].str.lower().isin(["nan", "none", "null", "nat", "#orden"]))
+            & (~df_vista[col_ord_main].str.startswith("#"))
+        ].copy()
+
+        if "Fecha_Raw" in df_vista.columns:
+            df_vista["Fecha_dt"] = df_vista["Fecha_Raw"].apply(parsear_fecha)
+
+            def formatear_fecha_mostrar(row):
+                dt = row["Fecha_dt"]
+                if pd.notna(dt) and dt is not None:
+                    return dt.strftime("%d/%m/%Y")
+                raw = str(row["Fecha_Raw"]).strip()
+                return raw if raw and raw.lower() != "nan" else ""
+
+            df_vista["Fecha"] = df_vista.apply(formatear_fecha_mostrar, axis=1)
+
+            total_reg = len(df_vista)
+            if "Cer firmado" in df_vista.columns:
+                total_firm = (
+                    df_vista["Cer firmado"]
+                    .astype(str)
+                    .str.strip()
+                    .str.upper()
+                    .isin(["SI", "SÍ"])
+                    .sum()
+                )
+            if "Enviado" in df_vista.columns:
+                total_env = (
+                    df_vista["Enviado"]
+                    .astype(str)
+                    .str.strip()
+                    .str.upper()
+                    .isin(["SI", "SÍ"])
+                    .sum()
+                )
+            total_pend = max(0, total_reg - total_env)
+
+            col_cer_check = next((c for c in df_vista.columns if "CER" in c.upper()), None)
+            col_crm_check = next((c for c in df_vista.columns if "CRM" in c.upper() and "SALIDA" in c.upper()), None)
+            
+            for _, r_m in df_vista.iterrows():
+                cer_m = str(r_m[col_cer_check]).strip().upper() if col_cer_check else ""
+                crm_m = str(r_m[col_crm_check]).strip().upper() if col_crm_check else ""
+                
+                if "CORREC" in cer_m:
+                    cant_correcciones += 1
+                elif cer_m in ["SI", "SÍ"] and crm_m not in ["SI", "SÍ"]:
+                    cant_atascadas += 1
+
+            df_hoy = df_vista[df_vista["Fecha_dt"] == hoy_dt].copy()
+
+            df_anteriores = df_vista[df_vista["Fecha_dt"] < hoy_dt].copy()
+            incompletas_list = []
+            for _, r_ant in df_anteriores.iterrows():
+                pct_ant, _ = calcular_progreso_orden(r_ant)
+                if pct_ant < 100:
+                    incompletas_list.append(r_ant)
+            if incompletas_list:
+                df_anteriores_incompletas = pd.DataFrame(incompletas_list)
+
+            if df_hoy.empty and not df_vista["Fecha_dt"].dropna().empty:
+                max_dt = df_vista["Fecha_dt"].dropna().max()
+                df_hoy = df_vista[df_vista["Fecha_dt"] == max_dt].copy()
+                fecha_activa_str = max_dt.strftime("%d/%m/%Y")
+            else:
+                fecha_activa_str = hoy_dt.strftime("%d/%m/%Y")
+
+            total_hoy = len(df_hoy)
+
+            df_vista = df_vista.sort_values(
+                by=["Fecha_dt", col_ord_main], ascending=[False, True]
+            ).reset_index(drop=True)
+
+            df_vista = df_vista.drop(columns=["Fecha_dt", "Fecha_Raw"], errors="ignore")
+
+    # 1. KPIs SUPERIORES
+    col1, col2, col3, col4 = st.columns(4)
+    with col1:
+        st.markdown(f'<div class="kpi-card"><div class="kpi-title">REGISTRADAS</div><div class="kpi-value">{total_reg}</div></div>', unsafe_allow_html=True)
+    with col2:
+        st.markdown(f'<div class="kpi-card"><div class="kpi-title">FIRMADAS ✏️</div><div class="kpi-value">{total_firm}</div></div>', unsafe_allow_html=True)
+    with col3:
+        st.markdown(f'<div class="kpi-card"><div class="kpi-title">ENVIADAS 📦</div><div class="kpi-value">{total_env}</div></div>', unsafe_allow_html=True)
+    with col4:
+        st.markdown(f'<div class="kpi-card"><div class="kpi-title">PENDIENTES ⌛</div><div class="kpi-value">{total_pend}</div></div>', unsafe_allow_html=True)
+
+    st.markdown("<div style='margin-bottom: 2px;'></div>", unsafe_allow_html=True)
+
+    # 2. CONTROLES Y BUSCADOR
+    if df_vista is not None and not df_vista.empty:
+        col_btn1, col_btn2, col_f_todas, col_f_atasc, col_f_correc, col_search_box, col_info = st.columns(
+            [0.55, 0.55, 0.9, 1.2, 1.2, 2.2, 1.5]
+        )
+
+        with col_btn1:
+            if st.button("⬆️ Subir"):
+                st.session_state.page_index = max(0, st.session_state.page_index - 1)
+                st.session_state.last_switch_time = time.time()
+                st.session_state.manual_nav_bonus = 30
+                st.rerun()
+
+        with col_btn2:
+            if st.button("⬇️ Bajar"):
+                st.session_state.page_index += 1
+                st.session_state.last_switch_time = time.time()
+                st.session_state.manual_nav_bonus = 30
+                st.rerun()
+
+        with col_f_todas:
+            lbl_todas = "📋 Todas" if st.session_state.alert_filter != "TODAS" else "▶ 📋 Todas"
+            if st.button(lbl_todas, key="btn_f_todas"):
+                st.session_state.alert_filter = "TODAS"
+                st.session_state.search_input = ""
+                st.session_state.page_index = 0
+                st.rerun()
+
+        with col_f_atasc:
+            lbl_atasc = f"⚠️ Atascadas ({cant_atascadas})" if st.session_state.alert_filter != "ATASCADAS" else f"▶ ⚠️ Atascadas ({cant_atascadas})"
+            if st.button(lbl_atasc, key="btn_f_atasc"):
+                st.session_state.alert_filter = "ATASCADAS"
+                st.session_state.search_input = ""
+                st.session_state.page_index = 0
+                st.rerun()
+
+        with col_f_correc:
+            lbl_correc = f"🚨 Corrección ({cant_correcciones})" if st.session_state.alert_filter != "CORRECCION" else f"▶ 🚨 Corrección ({cant_correcciones})"
+            if st.button(lbl_correc, key="btn_f_correc"):
+                st.session_state.alert_filter = "CORRECCION"
+                st.session_state.search_input = ""
+                st.session_state.page_index = 0
+                st.rerun()
+
+        with col_search_box:
+            c_in, c_x = st.columns([0.84, 0.16])
+            with c_in:
+                st.text_input(
+                    "Buscar Orden",
+                    key="search_input",
+                    placeholder="🔍 Buscar N° Orden...",
+                    label_visibility="collapsed",
+                )
+            with c_x:
+                if st.session_state.get("search_input", "").strip():
+                    st.button("❌", on_click=borrar_busqueda, key="btn_x_clear", help="Limpiar búsqueda")
+
+        col_cer_f = next((c for c in df_vista.columns if "CER" in c.upper()), None)
+        col_crm_f = next((c for c in df_vista.columns if "CRM" in c.upper() and "SALIDA" in c.upper()), None)
+
+        if st.session_state.alert_filter == "ATASCADAS" and col_cer_f and col_crm_f:
+            df_vista = df_vista[
+                df_vista[col_cer_f].astype(str).str.upper().isin(["SI", "SÍ"])
+                & (~df_vista[col_crm_f].astype(str).str.upper().isin(["SI", "SÍ"]))
+            ]
+        elif st.session_state.alert_filter == "CORRECCION" and col_cer_f:
+            df_vista = df_vista[df_vista[col_cer_f].astype(str).str.upper().str.contains("CORREC", na=False)]
+
+        term_search = st.session_state.get("search_input", "").strip().lower()
+        if term_search:
+            col_target = "# Orden" if "# Orden" in df_vista.columns else df_vista.columns[0]
+            df_vista = df_vista[df_vista[col_target].astype(str).str.lower().str.contains(term_search, na=False)]
+
+        filas_por_pagina = 10
+        total_filas = len(df_vista)
+        total_paginas = max(1, (total_filas + filas_por_pagina - 1) // filas_por_pagina)
+
+        if st.session_state.page_index >= total_paginas:
+            st.session_state.page_index = 0
+
+        p_idx = st.session_state.page_index
+        inicio = p_idx * filas_por_pagina
+        fin = min(inicio + filas_por_pagina, total_filas)
+        df_pagina = df_vista.iloc[inicio:fin]
+        cant_items_pagina = len(df_pagina)
+
+        duracion_base = 180 if p_idx == 0 else max(15, int(60 * (cant_items_pagina / filas_por_pagina)))
+        duracion_total = duracion_base + st.session_state.get("manual_nav_bonus", 0)
+
+        ahora = time.time()
+        tiempo_transcurrido = ahora - st.session_state.last_switch_time
+
+        if tiempo_transcurrido >= duracion_total and total_paginas > 1:
+            st.session_state.page_index = (st.session_state.page_index + 1) % total_paginas
+            st.session_state.last_switch_time = time.time()
+            st.session_state.manual_nav_bonus = 0
             st.rerun()
 
-    # CONTENEDOR DE CHAT DE NOVEDADES
-    st.markdown('<div class="chat-container">', unsafe_allow_html=True)
+        with col_info:
+            segundos_restantes = max(0, int(duracion_total - tiempo_transcurrido))
+            bonus_str = " (+30s)" if st.session_state.get("manual_nav_bonus", 0) > 0 else ""
+            f_active = f" | {st.session_state.alert_filter}" if st.session_state.alert_filter != "TODAS" else ""
+            st.caption(
+                f"Pág. {p_idx + 1}/{total_paginas} ({total_filas} reg.){f_active}"
+                f" | ⏱️ {segundos_restantes}s{bonus_str}"
+            )
 
-    msgs = ESTADO_GLOBAL["mensajes_bitacora"]
-    if not msgs:
-        st.caption("No hay novedades registradas hoy.")
+        st.markdown(render_dark_table(df_pagina), unsafe_allow_html=True)
 
-    for i, msg in enumerate(msgs):
-        now_ts = time.time()
-        elapsed = now_ts - msg.get("timestamp", now_ts)
-        cycle_sec = elapsed % 240
-        cycle_num = int(elapsed // 240)
+        if total_paginas > 1:
+            num_btns = min(total_paginas, 12)
+            col_widths = [0.04] * num_btns + [1.0 - (0.04 * num_btns)]
+            btn_cols = st.columns(col_widths)
+            for i in range(num_btns):
+                with btn_cols[i]:
+                    label = f"• {i+1} •" if i == st.session_state.page_index else f"{i+1}"
+                    if st.button(label, key=f"num_page_btn_{i}"):
+                        st.session_state.page_index = i
+                        st.session_state.last_switch_time = time.time()
+                        st.session_state.manual_nav_bonus = 30
+                        st.rerun()
 
-        st.markdown(render_chat_message_html(msg, cycle_sec, cycle_num), unsafe_allow_html=True)
+    else:
+        st.error(f"⚠️ {info_estado}")
 
-        col_m1, col_m2, col_m3 = st.columns([0.4, 0.3, 0.3])
+    st.markdown("<hr style='border-color: #1F2937; margin: 3px 0;'>", unsafe_allow_html=True)
 
-        if msg.get("estado") == "Pendiente":
-            with col_m1:
-                user_action = st.selectbox("Usuario:", LISTA_EMISORES, key=f"user_act_{msg['id']}")
-            with col_m2:
-                if st.button("✅ Realizado", key=f"btn_done_{msg['id']}"):
-                    msg["estado"] = "Atendido"
-                    msg["usuario_enterado"] = user_action
-                    msg["fecha_enterado"] = datetime.now().strftime("%H:%M:%S")
-                    st.rerun()
+    # 3. SECCIÓN INFERIOR
+    c_left, c_middle, c_right = st.columns([1.2, 1.1, 1.2])
+
+    with c_left:
+        has_anteriores_inc = not df_anteriores_incompletas.empty
+        now_p = time.time()
+        dt_p = now_p - st.session_state.prog_day_last_switch
+
+        if has_anteriores_inc:
+            if st.session_state.prog_day_page == 0 and dt_p >= 20:
+                st.session_state.prog_day_page = 1
+                st.session_state.prog_day_last_switch = now_p
+            elif st.session_state.prog_day_page == 1 and dt_p >= 5:
+                st.session_state.prog_day_page = 0
+                st.session_state.prog_day_last_switch = now_p
+
+        if st.session_state.prog_day_page == 1 and has_anteriores_inc:
+            df_prog_render = df_anteriores_incompletas
+            sub_caption = f"⚠️ **Pág 2/2:** Incompletas Anteriores (Vista 5s)"
         else:
-            with col_m1:
-                st.caption(f"Atendido por {msg.get('usuario_enterado')}")
+            st.session_state.prog_day_page = 0
+            df_prog_render = df_hoy
+            sub_caption = f"🗓️ **Pág 1/2:** Hoy ({fecha_activa_str}) | {total_hoy} órdenes"
 
-        with col_m3:
-            if st.button("🗑️ Borrar", key=f"btn_del_{msg['id']}"):
-                ESTADO_GLOBAL["mensajes_bitacora"].remove(msg)
-                st.rerun()
+        st.markdown("<h4 style='margin:0 0 1px 0; font-size:13.5px; color:#F3F4F6;'>🚚 Programados del Día</h4>", unsafe_allow_html=True)
+        st.caption(sub_caption)
+        
+        progresos = []
+        if df_prog_render is not None and not df_prog_render.empty:
+            for _, r in df_prog_render.iterrows():
+                ord_num = limpiar_texto(r.get('# Orden', ''))
+                if ord_num:
+                    pct, txt_falta = calcular_progreso_orden(r)
+                    progresos.append((ord_num, pct, txt_falta))
 
-        with st.expander("💬 Responder a esta novedad", expanded=False):
-            col_r1, col_r2 = st.columns([0.4, 0.6])
-            with col_r1:
-                user_reply = st.selectbox("Tu Nombre:", LISTA_EMISORES, key=f"u_rep_{msg['id']}")
-            with col_r2:
-                text_reply = st.text_input("Respuesta...", key=f"t_rep_{msg['id']}")
+        if progresos:
+            acumulado_general = int(np.mean([p[1] for p in progresos]))
+            
+            st.markdown(
+                f'<div style="background-color: #111827; border: 1px solid #1F2937; border-radius: 4px; padding: 3px 6px; margin-bottom: 3px;">'
+                f'<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1px;">'
+                f'<span style="font-size: 10px; font-weight: 700; color: #9CA3AF;">PROMEDIO VISTA</span>'
+                f'<span style="font-size: 11.5px; font-weight: 800; color: #38BDF8;">{acumulado_general}%</span>'
+                f'</div>'
+                f'<div style="background-color: #1F2937; border-radius: 3px; height: 5px; width: 100%; overflow: hidden;">'
+                f'<div style="background: linear-gradient(90deg, #3B82F6, #10B981); height: 100%; width: {acumulado_general}%;"></div>'
+                f'</div>'
+                f'</div>',
+                unsafe_allow_html=True,
+            )
 
-            if st.button("Enviar Respuesta", key=f"btn_send_rep_{msg['id']}") and text_reply.strip():
-                msg["respuestas"].append(
-                    {
-                        "usuario": user_reply,
-                        "texto": text_reply.strip(),
-                        "fecha_hora": datetime.now().strftime("%H:%M"),
-                    }
+            html_progresos = '<div style="display: flex; flex-direction: column; gap: 2px;">'
+            for ord_num, pct, txt_falta in progresos:
+                bar_color = "#10B981" if pct == 100 else ("#3B82F6" if pct >= 50 else "#F59E0B")
+                html_progresos += (
+                    f'<div class="progress-order-card">'
+                    f'<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1px;">'
+                    f'<span style="font-size: 11px; font-weight: 700; color: #F3F4F6;">📦 Orden #{ord_num}</span>'
+                    f'<span style="font-size: 10.5px; font-weight: 800; color: {bar_color};">{pct}%</span>'
+                    f'</div>'
+                    f'<div style="background-color: #1F2937; border-radius: 3px; height: 4px; width: 100%; overflow: hidden; margin-bottom: 1px;">'
+                    f'<div style="background-color: {bar_color}; height: 100%; width: {pct}%;"></div>'
+                    f'</div>'
+                    f'<div style="font-size: 9px; color: #9CA3AF; font-weight: 600;">{txt_falta}</div>'
+                    f'</div>'
                 )
-                st.rerun()
+            html_progresos += '</div>'
+            st.markdown(html_progresos, unsafe_allow_html=True)
+        else:
+            st.info("Sin órdenes en esta vista.")
 
-    st.markdown("</div>", unsafe_allow_html=True)
+    with c_middle:
+        st.markdown("<h4 style='margin:0 0 1px 0; font-size:13.5px; color:#F3F4F6;'>📋 Asignaciones del Día</h4>", unsafe_allow_html=True)
+        st.caption("Tareas y responsabilidades diarias")
+        
+        st.markdown(
+            '<div style="background-color: #111827; border: 1px dashed #374151; border-radius: 5px; padding: 12px 10px; text-align: center; color: #9CA3AF; margin-top: 2px;">'
+            '<div style="font-size: 18px; margin-bottom: 2px;">📋</div>'
+            '<div style="font-size: 12px; font-weight: 600; color: #D1D5DB;">Sin asignaciones pendientes</div>'
+            '<div style="font-size: 10.5px; margin-top: 1px; color: #6B7280;">Espacio listo para próxima integración</div>'
+            '</div>',
+            unsafe_allow_html=True,
+        )
+
+    # ---------------------------------------------------------
+    # BITÁCORA DIGITAL DE LABORATORIO (CHAT INTERACTIVO Y RESPUESTAS)
+    # ---------------------------------------------------------
+    with c_right:
+        col_b1, col_b2, col_b3 = st.columns([0.45, 0.32, 0.23])
+        with col_b1:
+            st.markdown("<h4 style='margin:0 0 1px 0; font-size:13.5px; color:#F3F4F6;'>📌 Bitácora / Chat</h4>", unsafe_allow_html=True)
+            st.caption("Novedades Operativas")
+
+        # BOTONES TIPO INTERRUPTOR / PILL TOGGLES (REDISAÑADOS COMO EN LA IMAGEN)
+        with col_b2:
+            st.markdown('<div class="pill-toggle-blue">', unsafe_allow_html=True)
+            if st.button("🔔 Permisos", key="btn_permisos_notif", help="Activar alertas flotantes de Windows/Browser"):
+                solicitar_permisos_notificaciones_js()
+            st.markdown('</div>', unsafe_allow_html=True)
+
+        with col_b3:
+            if st.session_state.sound_enabled:
+                st.markdown('<div class="pill-toggle-green">', unsafe_allow_html=True)
+                st.button("🔊 ON", on_click=toggle_sonido, key="btn_audio_state_on")
+                st.markdown('</div>', unsafe_allow_html=True)
+            else:
+                st.markdown('<div class="pill-toggle-red">', unsafe_allow_html=True)
+                st.button("🔇 OFF", on_click=toggle_sonido, key="btn_audio_state_off")
+                st.markdown('</div>', unsafe_allow_html=True)
+
+        # FORMULARIO PARA REGISTRAR NUEVO MENSAJE
+        with st.expander("💬 Registrar Novedad en Bitácora", expanded=False):
+            col_f1, col_f2 = st.columns(2)
+            with col_f1:
+                emisor_sel = st.selectbox(
+                    "De (Emisor):",
+                    options=LISTA_EMISORES,
+                    key="bit_emisor_sel"
+                )
+            with col_f2:
+                receptor_sel = st.selectbox(
+                    "Para (Receptor):",
+                    options=LISTA_RECEPTORES,
+                    index=0,
+                    key="bit_receptor_sel"
+                )
+
+            st.markdown("<label style='font-size:11px; font-weight:700; color:#9CA3AF;'>Prioridad del Mensaje:</label>", unsafe_allow_html=True)
+            prio_option = st.radio(
+                "Prioridad",
+                options=["🟢 Normal", "🟡 Auditoría", "🔴 Urgente"],
+                horizontal=True,
+                label_visibility="collapsed",
+                key="bit_prio_radio"
+            )
+
+            prio_clean = "Normal"
+            if "Auditoría" in prio_option:
+                prio_clean = "Auditoría"
+            elif "Urgente" in prio_option:
+                prio_clean = "Urgente"
+
+            contenido_input = st.text_area(
+                "Contenido / Novedad:",
+                placeholder="Escriba aquí la novedad u observación...",
+                height=65,
+                key="bit_contenido_txt"
+            )
+
+            # OPCIÓN PARA PERMITIR RESPUESTAS HILADAS
+            allow_replies = st.checkbox("💬 Permitir respuestas en este mensaje", value=False, key="chk_allow_replies")
+
+            if st.button("📤 Publicar Novedad", key="btn_publicar_bitacora"):
+                if contenido_input.strip():
+                    now_ts_new = time.time()
+                    nuevo_msg = {
+                        "id": f"msg_{int(now_ts_new * 1000)}",
+                        "emisor": emisor_sel,
+                        "receptor": receptor_sel,
+                        "prioridad": prio_clean,
+                        "contenido": contenido_input.strip(),
+                        "fecha_hora": datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
+                        "timestamp": now_ts_new,
+                        "estado": "Pendiente",
+                        "usuario_enterado": None,
+                        "fecha_enterado": None,
+                        "permitir_respuestas": allow_replies,
+                        "respuestas": []
+                    }
+                    ESTADO_GLOBAL["mensajes_bitacora"].insert(0, nuevo_msg)
+                    st.success("¡Novedad publicada correctamente!")
+                    st.rerun()
+                else:
+                    st.warning("Escriba el contenido antes de enviar.")
+
+        # FEED TIPO CHAT DE NOVEDADES
+        st.markdown("<div class='chat-container'>", unsafe_allow_html=True)
+        mensajes = ESTADO_GLOBAL.get("mensajes_bitacora", [])
+
+        if not mensajes:
+            st.info("Sin mensajes registrados en la Bitácora.")
+        else:
+            now_curr = time.time()
+            for idx_m, msg in enumerate(mensajes):
+                c_sec = 0
+                c_num = 0
+
+                if msg.get("prioridad") == "Urgente" and msg.get("estado") == "Pendiente":
+                    ts_start = msg.get("timestamp", now_curr)
+                    elapsed = max(0, now_curr - ts_start)
+                    c_sec = elapsed % 240
+                    c_num = int(elapsed // 240)
+
+                # DIBUJAR TARJETA DE NOVEDAD
+                st.markdown(render_chat_message_html(msg, cycle_sec=c_sec, cycle_num=c_num), unsafe_allow_html=True)
+
+                # SECCIÓN PARA RESPONDER (SI EL EMISOR LO HABILITÓ)
+                if msg.get("permitir_respuestas", False):
+                    with st.expander("💬 Responder a esta novedad", expanded=False):
+                        r_usr = st.selectbox("Tu Nombre:", options=LISTA_EMISORES, key=f"r_usr_{msg['id']}_{idx_m}")
+                        r_txt = st.text_input("Escribe tu respuesta:", key=f"r_txt_{msg['id']}_{idx_m}", placeholder="Responder...")
+                        if st.button("Enviar Respuesta", key=f"r_btn_{msg['id']}_{idx_m}"):
+                            if r_txt.strip():
+                                if "respuestas" not in msg:
+                                    msg["respuestas"] = []
+                                msg["respuestas"].append({
+                                    "usuario": r_usr,
+                                    "texto": r_txt.strip(),
+                                    "fecha_hora": datetime.now().strftime("%d/%m/%Y %H:%M")
+                                })
+                                st.rerun()
+
+                # BOTONES DE ACCIÓN (REALIZADO / ENTERADO / BORRAR)
+                if msg.get("estado") == "Pendiente":
+                    c_ack1, c_ack2, c_del = st.columns([0.42, 0.38, 0.20])
+                    with c_ack1:
+                        usr_confirm = st.selectbox(
+                            "Confirmar",
+                            options=LISTA_EMISORES,
+                            key=f"sel_ack_usr_{msg['id']}_{idx_m}",
+                            label_visibility="collapsed"
+                        )
+                    with c_ack2:
+                        lbl_action = "✅ Realizado" if msg.get("prioridad") != "Urgente" else "✅ Enterado"
+                        if st.button(lbl_action, key=f"btn_enterado_{msg['id']}_{idx_m}"):
+                            msg["estado"] = "Atendido"
+                            msg["usuario_enterado"] = usr_confirm
+                            msg["fecha_enterado"] = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+                            st.rerun()
+                    with c_del:
+                        if st.button("🗑️ Borrar", key=f"btn_del_urg_{msg['id']}_{idx_m}"):
+                            ESTADO_GLOBAL["mensajes_bitacora"] = [m for m in ESTADO_GLOBAL["mensajes_bitacora"] if m["id"] != msg["id"]]
+                            st.rerun()
+                else:
+                    c_spc, c_del = st.columns([0.80, 0.20])
+                    with c_del:
+                        if st.button("🗑️ Borrar", key=f"btn_del_norm_{msg['id']}_{idx_m}"):
+                            ESTADO_GLOBAL["mensajes_bitacora"] = [m for m in ESTADO_GLOBAL["mensajes_bitacora"] if m["id"] != msg["id"]]
+                            st.rerun()
+
+                st.markdown("<div style='margin-bottom: 2px;'></div>", unsafe_allow_html=True)
+
+        st.markdown("</div>", unsafe_allow_html=True)
+
+
+render_tablero_fluido()
