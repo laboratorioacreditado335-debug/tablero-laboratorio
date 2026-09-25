@@ -57,6 +57,8 @@ if "search_input" not in st.session_state:
     st.session_state.search_input = ""
 if "manual_nav_bonus" not in st.session_state:
     st.session_state.manual_nav_bonus = 0
+if "notif_enabled" not in st.session_state:
+    st.session_state.notif_enabled = True
 if "sound_enabled" not in st.session_state:
     st.session_state.sound_enabled = True
 if "session_start_time" not in st.session_state:
@@ -180,55 +182,6 @@ st.markdown(
         box-shadow: 0 0 8px rgba(59, 130, 246, 0.5) !important;
     }
 
-    /* BOTONES ESTILO INTERRUPTOR / PILL TOGGLES (COMO LA IMAGEN) */
-    .pill-toggle-blue div.stButton > button {
-        background: linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%) !important;
-        color: #FFFFFF !important;
-        border: 1px solid #60A5FA !important;
-        border-radius: 30px !important;
-        font-size: 11px !important;
-        font-weight: 800 !important;
-        padding: 2px 10px !important;
-        height: 30px !important;
-        box-shadow: 0 2px 8px rgba(37, 99, 235, 0.4) !important;
-    }
-    .pill-toggle-blue div.stButton > button:hover {
-        background: linear-gradient(135deg, #3B82F6 0%, #2563EB 100%) !important;
-        box-shadow: 0 0 12px rgba(59, 130, 246, 0.7) !important;
-    }
-
-    .pill-toggle-green div.stButton > button {
-        background: linear-gradient(135deg, #10B981 0%, #059669 100%) !important;
-        color: #FFFFFF !important;
-        border: 1px solid #34D399 !important;
-        border-radius: 30px !important;
-        font-size: 11px !important;
-        font-weight: 800 !important;
-        padding: 2px 10px !important;
-        height: 30px !important;
-        box-shadow: 0 2px 8px rgba(16, 185, 129, 0.4) !important;
-    }
-    .pill-toggle-green div.stButton > button:hover {
-        background: linear-gradient(135deg, #34D399 0%, #10B981 100%) !important;
-        box-shadow: 0 0 12px rgba(52, 211, 153, 0.7) !important;
-    }
-
-    .pill-toggle-red div.stButton > button {
-        background: linear-gradient(135deg, #EF4444 0%, #DC2626 100%) !important;
-        color: #FFFFFF !important;
-        border: 1px solid #F87171 !important;
-        border-radius: 30px !important;
-        font-size: 11px !important;
-        font-weight: 800 !important;
-        padding: 2px 10px !important;
-        height: 30px !important;
-        box-shadow: 0 2px 8px rgba(239, 68, 68, 0.4) !important;
-    }
-    .pill-toggle-red div.stButton > button:hover {
-        background: linear-gradient(135deg, #F87171 0%, #EF4444 100%) !important;
-        box-shadow: 0 0 12px rgba(248, 113, 113, 0.7) !important;
-    }
-
     /* SELECTOR SEGMENTADO MODO OSCURO (RADIO BUTTONS) */
     div[data-testid="stRadio"] > div {
         display: flex;
@@ -252,21 +205,21 @@ st.markdown(
         transition: all 0.2s ease;
     }
 
-    /* ESTILOS DE MÓDULO CHAT / BITÁCORA */
+    /* ESTILOS DE MÓDULO CHAT / BITÁCORA - OPTIMIZACIÓN DE ESPACIO */
     .chat-container {
         max-height: 420px;
         overflow-y: auto;
         padding-right: 4px;
         display: flex;
         flex-direction: column;
-        gap: 6px;
+        gap: 4px;
     }
 
     .msg-card-normal {
         background: #111827;
         border-left: 4px solid #10B981;
         border-radius: 6px;
-        padding: 7px 10px;
+        padding: 4px 8px;
         border-top: 1px solid #1F2937;
         border-right: 1px solid #1F2937;
         border-bottom: 1px solid #1F2937;
@@ -277,7 +230,7 @@ st.markdown(
         border-left: 4px solid #F59E0B;
         border: 1px solid #F59E0B;
         border-radius: 6px;
-        padding: 7px 10px;
+        padding: 4px 8px;
         box-shadow: 0 0 8px rgba(245, 158, 11, 0.2);
     }
 
@@ -286,7 +239,7 @@ st.markdown(
         background: linear-gradient(180deg, #064E3B 0%, #111827 100%);
         border: 2px solid #10B981;
         border-radius: 6px;
-        padding: 7px 10px;
+        padding: 4px 8px;
         box-shadow: 0 0 10px rgba(16, 185, 129, 0.4);
     }
 
@@ -294,7 +247,7 @@ st.markdown(
         background: linear-gradient(180deg, #78350F 0%, #111827 100%);
         border: 2px solid #F59E0B;
         border-radius: 6px;
-        padding: 7px 10px;
+        padding: 4px 8px;
         box-shadow: 0 0 12px rgba(245, 158, 11, 0.5);
     }
 
@@ -309,7 +262,7 @@ st.markdown(
         border: 2px solid #EF4444;
         animation: pulse-urgente 1.2s infinite;
         border-radius: 6px;
-        padding: 7px 10px;
+        padding: 4px 8px;
     }
 
     .msg-card-atendido {
@@ -317,7 +270,7 @@ st.markdown(
         border-left: 4px solid #10B981;
         border: 1px solid #1F2937;
         border-radius: 6px;
-        padding: 7px 10px;
+        padding: 4px 8px;
         opacity: 0.95;
     }
 
@@ -347,7 +300,7 @@ st.markdown(
         background: #1F2937;
         border-left: 3px solid #3B82F6;
         border-radius: 4px;
-        padding: 5px 8px;
+        padding: 4px 6px;
         margin-top: 4px;
         font-size: 11.5px;
     }
@@ -389,7 +342,7 @@ def solicitar_permisos_notificaciones_js():
             if (navNotif) {
                 navNotif.requestPermission().then(function(perm) {
                     if (perm === "granted") {
-                        alert("✅ Notificaciones elegantes en segundo plano y Sonido activados con éxito.");
+                        alert("✅ Notificaciones del sistema y sonido activados correctamente.");
                     } else {
                         alert("⚠️ Debes permitir las notificaciones en el navegador para recibir las alertas flotantes.");
                     }
@@ -435,10 +388,10 @@ def emitir_notificacion_y_audio_js(msg_id, emisor, receptor, prioridad, contenid
             if (msgId && !parentWin._processedMsgs[msgId]) {{
                 parentWin._processedMsgs[msgId] = true;
 
-                // 1. NOTIFICACIÓN DE ESCRITORIO BONITA EN SEGUNDO PLANO
+                // 1. NOTIFICACIÓN DE ESCRITORIO BONITA EN SEGUNDO PLANO (FORMATO COMPACTO)
                 if (navNotif && navNotif.permission === "granted") {{
                     var titulo = (prioridad === 'Urgente') ? "🚨 ¡ALERTA URGENTE DE LABORATORIO!" : "💬 NUEVA NOVEDAD DE BITÁCORA";
-                    var cuerpo = "👤 De: " + emisor + " ➔ Para: " + receptor + "\\n📝 " + contenido;
+                    var cuerpo = emisor + " ➔ " + receptor + "\\n📝 " + contenido;
                     var icono = (prioridad === 'Urgente') 
                         ? "https://cdn-icons-png.flaticon.com/512/1827/1827504.png"
                         : "https://cdn-icons-png.flaticon.com/512/3718/3718167.png";
@@ -856,21 +809,34 @@ def render_chat_message_html(msg, cycle_sec=0, cycle_num=0):
 def borrar_busqueda():
     st.session_state.search_input = ""
 
-def toggle_sonido():
-    st.session_state.sound_enabled = not st.session_state.sound_enabled
-
 
 # ---------------------------------------------------------
 # TABLERO DE CONTROL DINÁMICO
 # ---------------------------------------------------------
 @st.fragment(run_every=5)
 def render_tablero_fluido():
+    # DESLIZADORES (TOGGLES) NATIVOS EN LA PARTE SUPERIOR
+    col_t1, col_t2, _ = st.columns([0.18, 0.18, 0.64])
+    with col_t1:
+        notif_val = st.toggle("🔔 Notificaciones", value=st.session_state.get("notif_enabled", True), key="toggle_notif_top")
+        if notif_val != st.session_state.get("notif_enabled", True):
+            st.session_state.notif_enabled = notif_val
+            if notif_val:
+                solicitar_permisos_notificaciones_js()
+            st.rerun()
+
+    with col_t2:
+        sound_val = st.toggle("🔊 Sonido", value=st.session_state.get("sound_enabled", True), key="toggle_sound_top")
+        if sound_val != st.session_state.get("sound_enabled", True):
+            st.session_state.sound_enabled = sound_val
+            st.rerun()
+
     df_main, df_bitacora, info_estado = cargar_datos_gsheets()
 
     if "mensajes_bitacora" not in ESTADO_GLOBAL:
         ESTADO_GLOBAL["mensajes_bitacora"] = []
 
-    # MIGRACIÓN DE MENSAGES EXISTENTES
+    # MIGRACIÓN DE MENSAJES EXISTENTES
     for m in ESTADO_GLOBAL["mensajes_bitacora"]:
         if "permitir_respuestas" not in m:
             m["permitir_respuestas"] = False
@@ -925,14 +891,15 @@ def render_tablero_fluido():
     if mensajes_bit:
         ultimo_msg = mensajes_bit[0]
         if ultimo_msg.get("timestamp", 0) >= (st.session_state.session_start_time - 10):
-            emitir_notificacion_y_audio_js(
-                msg_id=ultimo_msg.get("id"),
-                emisor=ultimo_msg.get("emisor", "Sistema"),
-                receptor=ultimo_msg.get("receptor", "Todos"),
-                prioridad=ultimo_msg.get("prioridad", "Normal"),
-                contenido=ultimo_msg.get("contenido", ""),
-                sound_enabled=st.session_state.sound_enabled
-            )
+            if st.session_state.get("notif_enabled", True):
+                emitir_notificacion_y_audio_js(
+                    msg_id=ultimo_msg.get("id"),
+                    emisor=ultimo_msg.get("emisor", "Sistema"),
+                    receptor=ultimo_msg.get("receptor", "Todos"),
+                    prioridad=ultimo_msg.get("prioridad", "Normal"),
+                    contenido=ultimo_msg.get("contenido", ""),
+                    sound_enabled=st.session_state.sound_enabled
+                )
 
     # EVALUACIÓN DE MENSAJES URGENTES PENDIENTES
     urgentes_pendientes = [
@@ -1334,27 +1301,8 @@ def render_tablero_fluido():
     # BITÁCORA DIGITAL DE LABORATORIO (CHAT INTERACTIVO Y RESPUESTAS)
     # ---------------------------------------------------------
     with c_right:
-        col_b1, col_b2, col_b3 = st.columns([0.45, 0.32, 0.23])
-        with col_b1:
-            st.markdown("<h4 style='margin:0 0 1px 0; font-size:13.5px; color:#F3F4F6;'>📌 Bitácora / Chat</h4>", unsafe_allow_html=True)
-            st.caption("Novedades Operativas")
-
-        # BOTONES TIPO INTERRUPTOR / PILL TOGGLES (REDISAÑADOS COMO EN LA IMAGEN)
-        with col_b2:
-            st.markdown('<div class="pill-toggle-blue">', unsafe_allow_html=True)
-            if st.button("🔔 Permisos", key="btn_permisos_notif", help="Activar alertas flotantes de Windows/Browser"):
-                solicitar_permisos_notificaciones_js()
-            st.markdown('</div>', unsafe_allow_html=True)
-
-        with col_b3:
-            if st.session_state.sound_enabled:
-                st.markdown('<div class="pill-toggle-green">', unsafe_allow_html=True)
-                st.button("🔊 ON", on_click=toggle_sonido, key="btn_audio_state_on")
-                st.markdown('</div>', unsafe_allow_html=True)
-            else:
-                st.markdown('<div class="pill-toggle-red">', unsafe_allow_html=True)
-                st.button("🔇 OFF", on_click=toggle_sonido, key="btn_audio_state_off")
-                st.markdown('</div>', unsafe_allow_html=True)
+        st.markdown("<h4 style='margin:0 0 1px 0; font-size:13.5px; color:#F3F4F6;'>📌 Bitácora / Chat</h4>", unsafe_allow_html=True)
+        st.caption("Novedades Operativas")
 
         # FORMULARIO PARA REGISTRAR NUEVO MENSAJE
         with st.expander("💬 Registrar Novedad en Bitácora", expanded=False):
