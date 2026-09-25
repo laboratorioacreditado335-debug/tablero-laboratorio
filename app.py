@@ -48,7 +48,7 @@ def obtener_estado_global():
 
 ESTADO_GLOBAL = obtener_estado_global()
 
-# ESTADOS DE SESIÓN LOCALES
+# ESTADOS DE SESIÓN LOCALES (INDEPENDIENTES POR NAVEGADOR / PC)
 if "page_index" not in st.session_state:
     st.session_state.page_index = 0
 if "last_switch_time" not in st.session_state:
@@ -70,6 +70,10 @@ if "prog_day_last_switch" not in st.session_state:
     st.session_state.prog_day_last_switch = time.time()
 if "alert_filter" not in st.session_state:
     st.session_state.alert_filter = "TODAS"
+
+# MEMORIA LOCAL DE EMISOR POR NAVEGADOR
+if "emisor_local" not in st.session_state:
+    st.session_state.emisor_local = LISTA_EMISORES[0]
 
 
 # ---------------------------------------------------------
@@ -1308,11 +1312,17 @@ def render_tablero_fluido():
         with st.expander("💬 Registrar Novedad en Bitácora", expanded=False):
             col_f1, col_f2 = st.columns(2)
             with col_f1:
+                idx_emisor_local = LISTA_EMISORES.index(st.session_state.emisor_local) if st.session_state.emisor_local in LISTA_EMISORES else 0
                 emisor_sel = st.selectbox(
                     "De (Emisor):",
                     options=LISTA_EMISORES,
+                    index=idx_emisor_local,
                     key="bit_emisor_sel"
                 )
+                # Actualizar la memoria de sesión local si cambia la selección
+                if emisor_sel != st.session_state.emisor_local:
+                    st.session_state.emisor_local = emisor_sel
+
             with col_f2:
                 receptor_sel = st.selectbox(
                     "Para (Receptor):",
@@ -1393,7 +1403,8 @@ def render_tablero_fluido():
                 # SECCIÓN PARA RESPONDER (SI EL EMISOR LO HABILITÓ)
                 if msg.get("permitir_respuestas", False):
                     with st.expander("💬 Responder a esta novedad", expanded=False):
-                        r_usr = st.selectbox("Tu Nombre:", options=LISTA_EMISORES, key=f"r_usr_{msg['id']}_{idx_m}")
+                        idx_reply_local = LISTA_EMISORES.index(st.session_state.emisor_local) if st.session_state.emisor_local in LISTA_EMISORES else 0
+                        r_usr = st.selectbox("Tu Nombre:", options=LISTA_EMISORES, index=idx_reply_local, key=f"r_usr_{msg['id']}_{idx_m}")
                         r_txt = st.text_input("Escribe tu respuesta:", key=f"r_txt_{msg['id']}_{idx_m}", placeholder="Responder...")
                         if st.button("Enviar Respuesta", key=f"r_btn_{msg['id']}_{idx_m}"):
                             if r_txt.strip():
@@ -1404,15 +1415,18 @@ def render_tablero_fluido():
                                     "texto": r_txt.strip(),
                                     "fecha_hora": datetime.now().strftime("%d/%m/%Y %H:%M")
                                 })
+                                st.session_state.emisor_local = r_usr
                                 st.rerun()
 
                 # BOTONES DE ACCIÓN (REALIZADO / ENTERADO / BORRAR)
                 if msg.get("estado") == "Pendiente":
                     c_ack1, c_ack2, c_del = st.columns([0.42, 0.38, 0.20])
                     with c_ack1:
+                        idx_ack_local = LISTA_EMISORES.index(st.session_state.emisor_local) if st.session_state.emisor_local in LISTA_EMISORES else 0
                         usr_confirm = st.selectbox(
                             "Confirmar",
                             options=LISTA_EMISORES,
+                            index=idx_ack_local,
                             key=f"sel_ack_usr_{msg['id']}_{idx_m}",
                             label_visibility="collapsed"
                         )
@@ -1422,6 +1436,7 @@ def render_tablero_fluido():
                             msg["estado"] = "Atendido"
                             msg["usuario_enterado"] = usr_confirm
                             msg["fecha_enterado"] = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+                            st.session_state.emisor_local = usr_confirm
                             st.rerun()
                     with c_del:
                         if st.button("🗑️ Borrar", key=f"btn_del_urg_{msg['id']}_{idx_m}"):
